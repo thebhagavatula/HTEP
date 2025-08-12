@@ -1,0 +1,12 @@
+# Data files
+data/
+logs/
+*.pdf
+*.png
+*.jpg
+
+# Python
+__pycache__/
+*.pyc
+.env
+venv/

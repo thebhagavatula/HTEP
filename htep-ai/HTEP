@@ -1,1 +1,0 @@
-# Healthcare Text Extraction Platform

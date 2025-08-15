@@ -1,0 +1,28 @@
+# Core OCR and Image Processing
+opencv-python==4.12.0.88
+pytesseract==0.3.10
+pdf2image==1.16.3
+Pillow==10.0.0
+
+# Data Processing
+pandas==2.0.3
+numpy==1.24.3
+
+# Machine Learning (for future classification)
+scikit-learn==1.7.1
+
+# Text Processing
+nltk==3.9.1
+
+# Jupyter for exploration
+jupyter==1.0.0
+ipykernel==6.25.0
+
+# Progress bars and utilities
+tqdm==4.67.1
+
+# Logging and configuration
+python-dotenv==1.0.0
+
+# Testing
+pytest==7.4.0

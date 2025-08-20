@@ -1,0 +1,417 @@
+[
+  {
+    "filename": "Discharge_Summary.pdf",
+    "file_path": "data\\sample\\Discharge_Summary.pdf",
+    "pages": {
+      "page_1": {
+        "raw_text": "CityCare Hospital — Discharge Summary\nPatient Name : Vikas Reddy\nPatient ID : CH-3021\nAge 745\nGender : Male\nAdmission Date: 02/08/2025\nDischarge Date: 07/08/2025\nDiagnosis:\n- Type 2 Diabetes Mellitus (controlled)\n- Mild Hypertension\nTreatment Summary:\n- Metformin 500mg twice daily\n- Amlodipine 5mg once daily\n- Low-sodium diabetic diet\n- Daily BP and sugar monitoring\nFollow-up Instructions:\nVisit endocrinology OPD after 15 days.\nContinue medications, avoid high-sugar foods.\nConsultant: Dr. Sanjay Kapoor\nSignature:",
+        "cleaned_text": "CityCare Hospital — Discharge Summary Patient Name : Vikas Reddy Patient ID : CH-3021 Age 745 Gender : Male Admission Date: 02/08/2025 Discharge Date: 07/08/2025 Diagnosis: - Type 2 Diabetes Mellitus (controlled) - Mild Hypertension Treatment Summary: - Metformin 500mg twice daily - Amlodipine 5mg once daily - Low-sodium diabetic diet - Daily BP and sugar monitoring Follow-up Instructions: Visit endocrinology OPD after 15 days. Continue medications, avoid high-sugar foods. Consultant: Dr. Sanjay Kapoor Signature:",
+        "text_length": 518,
+        "segments_count": 1,
+        "segments": [
+          {
+            "segment_type": "diagnosis",
+            "content_preview": "CityCare Hospital — Discharge Summary Patient Name : Vikas Reddy Patient ID : CH-3021 Age 745 Gender : Male Admission Date: 02/08/2025 Discharge Date: 07/08/2025 Diagnosis: - Type 2 Diabetes Mellitus ...",
+            "full_content": "CityCare Hospital — Discharge Summary Patient Name : Vikas Reddy Patient ID : CH-3021 Age 745 Gender : Male Admission Date: 02/08/2025 Discharge Date: 07/08/2025 Diagnosis: - Type 2 Diabetes Mellitus (controlled) - Mild Hypertension Treatment Summary: - Metformin 500mg twice daily - Amlodipine 5mg once daily - Low-sodium diabetic diet - Daily BP and sugar monitoring Follow-up Instructions: Visit endocrinology OPD after 15 days. Continue medications, avoid high-sugar foods. Consultant: Dr. Sanjay Kapoor Signature:",
+            "classification": {
+              "document_type": "prescription",
+              "confidence": 0.5,
+              "keywords_found": [
+                "Discharge Summary",
+                "Admission Date",
+                "admission",
+                "discharge",
+                "admission date",
+                "discharge date",
+                "follow-up",
+                "mg",
+                "twice daily",
+                "once daily",
+                "ml",
+                "medication",
+                "500mg twice daily",
+                "5mg once daily"
+              ]
+            },
+            "start_line": 0,
+            "end_line": 0
+          }
+        ],
+        "overall_classification": {
+          "document_type": "prescription",
+          "confidence": 0.5,
+          "secondary_types": [
+            [
+              "discharge_summary",
+              0.4444444444444444
+            ],
+            [
+              "consultation_note",
+              0.05555555555555555
+            ]
+          ]
+        },
+        "medical_entities": {
+          "medications": [
+            "Amlodipine"
+          ],
+          "conditions": [
+            "Hypertension",
+            "Diabetes"
+          ],
+          "procedures": [],
+          "measurements": []
+        },
+        "urgency_assessment": {
+          "level": "routine",
+          "confidence": 0.5
+        },
+        "key_value_pairs": {},
+        "dates_found": [
+          "02/08/2025",
+          "07/08/2025"
+        ]
+      }
+    },
+    "overall_classification": {
+      "document_type": "prescription",
+      "confidence": 0.5,
+      "secondary_types": [
+        [
+          "discharge_summary",
+          0.4444444444444444
+        ],
+        [
+          "consultation_note",
+          0.05555555555555555
+        ]
+      ]
+    },
+    "processing_errors": [],
+    "segment_summary": {
+      "diagnosis": 1
+    },
+    "total_segments": 1
+  },
+  {
+    "filename": "Pathology_Report.pdf",
+    "file_path": "data\\sample\\Pathology_Report.pdf",
+    "pages": {
+      "page_1": {
+        "raw_text": "Sunrise Diagnostics\nLab Report No.: LRP-2025-0876\nDate: 10/08/2025\nPatient Name : Priya Nair\nAge : 28\nGender : Female\nTest: Complete Blood Count (CBC)\nWBC Count : 7,200 / uL (Normal: 4,000 - 11,000)\nRBC Count > 4.5 million / uL (Normal: 3.8 - 5.2)\nHemoglobin  : 12.8 g/dL (Normal: 12 - 15.5)\nPlatelet Count : 2,50,000 / uL (Normal: 1,50,000 - 4,50,000)\nRemarks:\nAll parameters within normal range.\nVerified By: Dr. Anil Mehta (Pathologist)",
+        "cleaned_text": "Sunrise Diagnostics Lab Report No.: LRP-2025-0876 Date: 10/08/2025 Patient Name : Priya Nair Age : 28 Gender : Female Test: Complete Blood Count (CBC) WBC Count : 7,200 / uL (Normal: 4,000 - 11,000) RBC Count > 4.5 million / uL (Normal: 3.8 - 5.2) Hemoglobin : 12.8 g/dL (Normal: 12 - 15.5) Platelet Count : 2,50,000 / uL (Normal: 1,50,000 - 4,50,000) Remarks: All parameters within normal range. Verified By: Dr. Anil Mehta (Pathologist)",
+        "text_length": 438,
+        "segments_count": 1,
+        "segments": [
+          {
+            "segment_type": "general_content",
+            "content_preview": "Sunrise Diagnostics Lab Report No.: LRP-2025-0876 Date: 10/08/2025 Patient Name : Priya Nair Age : 28 Gender : Female Test: Complete Blood Count (CBC) WBC Count : 7,200 / uL (Normal: 4,000 - 11,000) R...",
+            "full_content": "Sunrise Diagnostics Lab Report No.: LRP-2025-0876 Date: 10/08/2025 Patient Name : Priya Nair Age : 28 Gender : Female Test: Complete Blood Count (CBC) WBC Count : 7,200 / uL (Normal: 4,000 - 11,000) RBC Count > 4.5 million / uL (Normal: 3.8 - 5.2) Hemoglobin : 12.8 g/dL (Normal: 12 - 15.5) Platelet Count : 2,50,000 / uL (Normal: 1,50,000 - 4,50,000) Remarks: All parameters within normal range. Verified By: Dr. Anil Mehta (Pathologist)",
+            "classification": {
+              "document_type": "lab_report",
+              "confidence": 0.95,
+              "keywords_found": [
+                "normal range",
+                "Lab Report",
+                "12.8 g/dL",
+                "hemoglobin"
+              ]
+            },
+            "start_line": 0,
+            "end_line": 0
+          }
+        ],
+        "overall_classification": {
+          "document_type": "lab_report",
+          "confidence": 0.95,
+          "secondary_types": []
+        },
+        "medical_entities": {
+          "medications": [],
+          "conditions": [],
+          "procedures": [],
+          "measurements": []
+        },
+        "urgency_assessment": {
+          "level": "routine",
+          "confidence": 0.5
+        },
+        "key_value_pairs": {},
+        "dates_found": [
+          "10/08/2025"
+        ]
+      }
+    },
+    "overall_classification": {
+      "document_type": "lab_report",
+      "confidence": 0.95,
+      "secondary_types": []
+    },
+    "processing_errors": [],
+    "segment_summary": {
+      "general_content": 1
+    },
+    "total_segments": 1
+  },
+  {
+    "filename": "Prescription.pdf",
+    "file_path": "data\\sample\\Prescription.pdf",
+    "pages": {
+      "page_1": {
+        "raw_text": "ABC Multispeciality Clinic\nPatient Name : Rahul Sharma\nPatient ID :P2025-015\nDate > 14/08/2025\nAge : 34\nGender : Male\nDiagnosis:\n- Acute Sinusitis\nPrescription:\n1. Amoxicillin 500mg — 1 tablet thrice daily for 5 days\n2. Paracetamol 650mg — 1 tablet twice daily after meals\n3. Steam inhalation — twice daily\nDoctor’s Notes:\nIncrease fluid intake, avoid cold drinks, follow up after 7 days.\nDoctor: Dr. Neha Agarwal (ENT Specialist)\nContact: +91-9876543210\nSignature:",
+        "cleaned_text": "ABC Multispeciality Clinic Patient Name : Rahul Sharma Patient ID :P2025-015 Date > 14/08/2025 Age : 34 Gender : Male Diagnosis: - Acute Sinusitis Prescription: 1. Amoxicillin 500mg — 1 tablet thrice daily for 5 days 2. Paracetamol 650mg — 1 tablet twice daily after meals 3. Steam inhalation — twice daily Doctor’s Notes: Increase fluid intake, avoid cold drinks, follow up after 7 days. Doctor: Dr. Neha Agarwal (ENT Specialist) Contact: +91-9876543210 Signature:",
+        "text_length": 465,
+        "segments_count": 1,
+        "segments": [
+          {
+            "segment_type": "patient_info",
+            "content_preview": "ABC Multispeciality Clinic Patient Name : Rahul Sharma Patient ID :P2025-015 Date > 14/08/2025 Age : 34 Gender : Male Diagnosis: - Acute Sinusitis Prescription: 1. Amoxicillin 500mg — 1 tablet thrice ...",
+            "full_content": "ABC Multispeciality Clinic Patient Name : Rahul Sharma Patient ID :P2025-015 Date > 14/08/2025 Age : 34 Gender : Male Diagnosis: - Acute Sinusitis Prescription: 1. Amoxicillin 500mg — 1 tablet thrice daily for 5 days 2. Paracetamol 650mg — 1 tablet twice daily after meals 3. Steam inhalation — twice daily Doctor’s Notes: Increase fluid intake, avoid cold drinks, follow up after 7 days. Doctor: Dr. Neha Agarwal (ENT Specialist) Contact: +91-9876543210 Signature:",
+            "classification": {
+              "document_type": "prescription",
+              "confidence": 0.7142857142857143,
+              "keywords_found": [
+                "prescription",
+                "follow up",
+                "mg",
+                "twice daily",
+                "specialist",
+                "Prescription:"
+              ]
+            },
+            "start_line": 0,
+            "end_line": 0
+          }
+        ],
+        "overall_classification": {
+          "document_type": "prescription",
+          "confidence": 0.7142857142857143,
+          "secondary_types": [
+            [
+              "consultation_note",
+              0.2857142857142857
+            ]
+          ]
+        },
+        "medical_entities": {
+          "medications": [
+            "Amoxicillin",
+            "Paracetamol"
+          ],
+          "conditions": [],
+          "procedures": [],
+          "measurements": []
+        },
+        "urgency_assessment": {
+          "level": "urgent",
+          "confidence": 0.7
+        },
+        "key_value_pairs": {
+          "abc multispeciality clinic patient name": "Rahul Sharma Patient ID :P2025-015 Date > 14/08/2025 Age : 34 Gender : Male Diagnosis: - Acute Sinusitis Prescription: 1. Amoxicillin 500mg — 1 tablet thrice daily for 5 days 2. Paracetamol 650mg — 1 tablet twice daily after meals 3. Steam inhalation — twice daily Doctor’s Notes: Increase fluid intake, avoid cold drinks, follow up after 7 days. Doctor: Dr. Neha Agarwal (ENT Specialist) Contact: +91-9876543210 Signature:"
+        },
+        "dates_found": [
+          "14/08/2025"
+        ]
+      }
+    },
+    "overall_classification": {
+      "document_type": "prescription",
+      "confidence": 0.7142857142857143,
+      "secondary_types": [
+        [
+          "consultation_note",
+          0.2857142857142857
+        ]
+      ]
+    },
+    "processing_errors": [],
+    "segment_summary": {
+      "patient_info": 1
+    },
+    "total_segments": 1
+  },
+  {
+    "filename": "Radiology_Report.pdf",
+    "file_path": "data\\sample\\Radiology_Report.pdf",
+    "pages": {
+      "page_1": {
+        "raw_text": "Radiology Imaging Centre\nMRI Report — Brain\nReport No.: MRI-2025-0542\nDate: 12/08/2025\nPatient Name : Meera Joshi\nAge : 38\nGender : Female\nIndication: Chronic headaches, dizziness.\nFindings:\n- No evidence of acute infarct or hemorrhage.\n- Minimal sinus mucosal thickening.\n- Ventricular system normal in size and configuration.\nImpression:\nNo significant intracranial abnormality detected.\nRadiologist: Dr. Kavita Menon\nContact: +91-9123456780\nSignature:",
+        "cleaned_text": "Radiology Imaging Centre MRI Report — Brain Report No.: MRI-2025-0542 Date: 12/08/2025 Patient Name : Meera Joshi Age : 38 Gender : Female Indication: Chronic headaches, dizziness. Findings: - No evidence of acute infarct or hemorrhage. - Minimal sinus mucosal thickening. - Ventricular system normal in size and configuration. Impression: No significant intracranial abnormality detected. Radiologist: Dr. Kavita Menon Contact: +91-9123456780 Signature:",
+        "text_length": 454,
+        "segments_count": 1,
+        "segments": [
+          {
+            "segment_type": "patient_info",
+            "content_preview": "Radiology Imaging Centre MRI Report — Brain Report No.: MRI-2025-0542 Date: 12/08/2025 Patient Name : Meera Joshi Age : 38 Gender : Female Indication: Chronic headaches, dizziness. Findings: - No evid...",
+            "full_content": "Radiology Imaging Centre MRI Report — Brain Report No.: MRI-2025-0542 Date: 12/08/2025 Patient Name : Meera Joshi Age : 38 Gender : Female Indication: Chronic headaches, dizziness. Findings: - No evidence of acute infarct or hemorrhage. - Minimal sinus mucosal thickening. - Ventricular system normal in size and configuration. Impression: No significant intracranial abnormality detected. Radiologist: Dr. Kavita Menon Contact: +91-9123456780 Signature:",
+            "classification": {
+              "document_type": "radiology_report",
+              "confidence": 0.875,
+              "keywords_found": [
+                "radiology",
+                "abnormal",
+                "impression",
+                "MRI Report",
+                "mri",
+                "findings",
+                "radiologist"
+              ]
+            },
+            "start_line": 0,
+            "end_line": 0
+          }
+        ],
+        "overall_classification": {
+          "document_type": "radiology_report",
+          "confidence": 0.875,
+          "secondary_types": [
+            [
+              "lab_report",
+              0.125
+            ]
+          ]
+        },
+        "medical_entities": {
+          "medications": [],
+          "conditions": [],
+          "procedures": [
+            "MRI"
+          ],
+          "measurements": []
+        },
+        "urgency_assessment": {
+          "level": "urgent",
+          "confidence": 0.7
+        },
+        "key_value_pairs": {
+          "radiology imaging centre mri report — brain report no.": "MRI-2025-0542 Date: 12/08/2025 Patient Name : Meera Joshi Age : 38 Gender : Female Indication: Chronic headaches, dizziness. Findings: - No evidence of acute infarct or hemorrhage. - Minimal sinus mucosal thickening. - Ventricular system normal in size and configuration. Impression: No significant intracranial abnormality detected. Radiologist: Dr. Kavita Menon Contact: +91-9123456780 Signature:"
+        },
+        "dates_found": [
+          "12/08/2025"
+        ]
+      }
+    },
+    "overall_classification": {
+      "document_type": "radiology_report",
+      "confidence": 0.875,
+      "secondary_types": [
+        [
+          "lab_report",
+          0.125
+        ]
+      ]
+    },
+    "processing_errors": [],
+    "segment_summary": {
+      "patient_info": 1
+    },
+    "total_segments": 1
+  },
+  {
+    "filename": "RCF.jpg",
+    "file_path": "data\\sample\\RCF.jpg",
+    "file_type": "image",
+    "pages": {
+      "image_content": {
+        "raw_text": "eS cinMabs\n—Diagagist\n—abeas\nee\nee\na ee",
+        "cleaned_text": "eS cinMabs —Diagagist —abeas ee ee a ee",
+        "text_length": 39,
+        "segments_count": 1,
+        "segments": [
+          {
+            "segment_type": "general_content",
+            "content_preview": "eS cinMabs —Diagagist —abeas ee ee a ee",
+            "full_content": "eS cinMabs —Diagagist —abeas ee ee a ee",
+            "classification": {
+              "document_type": "general_medical",
+              "confidence": 0.3,
+              "keywords_found": []
+            },
+            "start_line": 0,
+            "end_line": 0
+          }
+        ],
+        "overall_classification": {
+          "document_type": "general_medical",
+          "confidence": 0.3,
+          "secondary_types": []
+        },
+        "medical_entities": {
+          "medications": [],
+          "conditions": [],
+          "procedures": [],
+          "measurements": []
+        },
+        "urgency_assessment": {
+          "level": "routine",
+          "confidence": 0.5
+        },
+        "key_value_pairs": {},
+        "dates_found": []
+      }
+    },
+    "overall_classification": {
+      "document_type": "general_medical",
+      "confidence": 0.3,
+      "secondary_types": []
+    },
+    "processing_errors": [],
+    "segment_summary": {
+      "general_content": 1
+    },
+    "total_segments": 1
+  },
+  {
+    "filename": "RCF.pdf",
+    "file_path": "data\\sample\\RCF.pdf",
+    "pages": {
+      "page_1": {
+        "raw_text": "ee ee ee\n. . . . - J. es * - pee - wo eee ere\n. toy * er) ee ae oe\nv we ’ . -* .\n-",
+        "cleaned_text": "ee ee ee . . . . - J. es * - pee - wo eee ere . toy * er) ee ae oe v we ’ . -* . -",
+        "text_length": 82,
+        "segments_count": 1,
+        "segments": [
+          {
+            "segment_type": "general_content",
+            "content_preview": "ee ee ee . . . . - J. es * - pee - wo eee ere . toy * er) ee ae oe v we ’ . -* . -",
+            "full_content": "ee ee ee . . . . - J. es * - pee - wo eee ere . toy * er) ee ae oe v we ’ . -* . -",
+            "classification": {
+              "document_type": "general_medical",
+              "confidence": 0.3,
+              "keywords_found": []
+            },
+            "start_line": 0,
+            "end_line": 0
+          }
+        ],
+        "overall_classification": {
+          "document_type": "general_medical",
+          "confidence": 0.3,
+          "secondary_types": []
+        },
+        "medical_entities": {
+          "medications": [],
+          "conditions": [],
+          "procedures": [],
+          "measurements": []
+        },
+        "urgency_assessment": {
+          "level": "routine",
+          "confidence": 0.5
+        },
+        "key_value_pairs": {},
+        "dates_found": []
+      }
+    },
+    "overall_classification": {
+      "document_type": "general_medical",
+      "confidence": 0.3,
+      "secondary_types": []
+    },
+    "processing_errors": [],
+    "segment_summary": {
+      "general_content": 1
+    },
+    "total_segments": 1
+  }
+]

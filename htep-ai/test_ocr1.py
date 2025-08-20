@@ -1,357 +1,601 @@
-# test_ocr.py - Focused OCR optimization with better diagnostics and performance
+# test_ocr.py - Enhanced OCR test with segmentation and classification
 
 import os
 import sys
-import time
-import traceback
+import json
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Any
+import logging
 
 # Add src to path so we can import our modules
 src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'src'))
 if src_path not in sys.path:
     sys.path.insert(0, src_path)
 
+from src.ocr.extractor import OCRExtractor
+from src.segmentation.segmenter import MedicalDocumentSegmenter, SimpleTextProcessor
+from src.classification.classifier import MedicalDocumentClassifier
 
-class ColoredOutput:
-    """Simple colored output for better readability."""
-    GREEN = '\033[92m'
-    RED = '\033[91m'
-    YELLOW = '\033[93m'
-    BLUE = '\033[94m'
-    BOLD = '\033[1m'
-    END = '\033[0m'
-
-    @classmethod
-    def success(cls, text: str) -> str:
-        return f"{cls.GREEN}✓{cls.END} {text}"
-
-    @classmethod
-    def error(cls, text: str) -> str:
-        return f"{cls.RED}✗{cls.END} {text}"
-
-    @classmethod
-    def warning(cls, text: str) -> str:
-        return f"{cls.YELLOW}⚠{cls.END} {text}"
-
-    @classmethod
-    def info(cls, text: str) -> str:
-        return f"{cls.BLUE}ℹ{cls.END} {text}"
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 
-def check_system_dependencies() -> bool:
-    """Check system-level dependencies like Tesseract."""
-    print("\nChecking System Dependencies...")
-    print("-" * 50)
+class MedicalDocumentProcessor:
+    """Main processor for medical documents with OCR, segmentation, and classification."""
 
-    try:
-        import pytesseract
-
-        # Test if Tesseract is actually available
+    def __init__(self):
+        """Initialize all components."""
         try:
-            version = pytesseract.get_tesseract_version()
-            print(ColoredOutput.success(f"Tesseract OCR {version}"))
-            return True
+            self.ocr_extractor = OCRExtractor()
+            self.segmenter = MedicalDocumentSegmenter()
+            self.classifier = MedicalDocumentClassifier()
+            self.text_processor = SimpleTextProcessor()
+            print("✓ All components initialized successfully")
         except Exception as e:
-            print(ColoredOutput.error(f"Tesseract OCR - {str(e)}"))
-            print(ColoredOutput.info("Install Tesseract OCR:"))
-            print("  Windows: Download from https://github.com/UB-Mannheim/tesseract/wiki")
-            print("  macOS: brew install tesseract")
-            print("  Ubuntu: sudo apt install tesseract-ocr")
-            return False
+            print(f"✗ Failed to initialize components: {e}")
+            raise
 
-    except ImportError:
-        print(ColoredOutput.error("pytesseract not installed"))
-        return False
+    def process_pdf(self, pdf_path: str) -> Dict[str, Any]:
+        """
+        Process a single PDF through the complete pipeline.
+
+        Args:
+            pdf_path: Path to the PDF file
+
+        Returns:
+            Dictionary containing all processing results
+        """
+        print(f"\n📄 Processing: {Path(pdf_path).name}")
+        print("=" * 80)
+
+        results = {
+            'filename': Path(pdf_path).name,
+            'file_path': pdf_path,
+            'pages': {},
+            'overall_classification': None,
+            'processing_errors': []
+        }
+
+        try:
+            # Step 1: Extract text from PDF
+            extracted_text = self.ocr_extractor.extract_from_pdf(pdf_path)
+
+            if not extracted_text:
+                results['processing_errors'].append("No text extracted from PDF")
+                print("❌ No text extracted from PDF")
+                return results
+
+            print(f"✓ Extracted text from {len(extracted_text)} page(s)")
+
+            # Process each page
+            all_segments = []
+            page_results = {}
+
+            for page_name, page_text in extracted_text.items():
+                print(f"\n📑 {page_name.upper()}")
+                print("-" * 80)
+
+                # Show the extracted text first
+                print("🔤 EXTRACTED TEXT:")
+                print("-" * 40)
+                print(page_text)
+                print("-" * 40)
+
+                # Step 2: Clean the text
+                cleaned_text = self.text_processor.clean_medical_text(page_text)
+
+                # Step 3: Segment the text
+                segments = self.segmenter.segment_document(cleaned_text)
+                print(f"\n🔍 SEGMENTATION ANALYSIS:")
+                print(f"Found {len(segments)} segments:")
+
+                # Show each segment
+                for i, segment in enumerate(segments, 1):
+                    print(f"\n  📝 Segment {i}: {segment.segment_type.replace('_', ' ').title()}")
+                    print(f"     Lines {segment.start_line}-{segment.end_line}")
+                    print(f"     Content: {segment.content[:150]}{'...' if len(segment.content) > 150 else ''}")
+
+                # Step 4: Classify each segment and the whole page
+                print(f"\n🏷️  CLASSIFICATION RESULTS:")
+
+                segment_classifications = []
+                for i, segment in enumerate(segments, 1):
+                    classification = self.classifier.classify_document(segment.content)
+                    print(
+                        f"  Segment {i} ({segment.segment_type}): {classification.document_type} ({classification.confidence:.1%})")
+                    if classification.keywords_found:
+                        print(f"    Keywords: {', '.join(classification.keywords_found[:5])}")
+
+                    segment_classifications.append({
+                        'segment_type': segment.segment_type,
+                        'content_preview': segment.content[:200] + "..." if len(
+                            segment.content) > 200 else segment.content,
+                        'full_content': segment.content,
+                        'classification': {
+                            'document_type': classification.document_type,
+                            'confidence': classification.confidence,
+                            'keywords_found': classification.keywords_found
+                        },
+                        'start_line': segment.start_line,
+                        'end_line': segment.end_line
+                    })
+
+                # Step 5: Get overall page classification
+                page_classification = self.classifier.classify_document(cleaned_text)
+                print(
+                    f"\n  📄 Overall Page Classification: {page_classification.document_type.replace('_', ' ').title()}")
+                print(f"     Confidence: {page_classification.confidence:.1%}")
+                if page_classification.secondary_types:
+                    print(
+                        f"     Secondary possibilities: {', '.join([f'{t[0]} ({t[1]:.1%})' for t in page_classification.secondary_types[:2]])}")
+
+                # Step 6: Extract additional information
+                print(f"\n🏥 MEDICAL INFORMATION EXTRACTION:")
+
+                key_value_pairs = {}
+                medical_entities = self.classifier.extract_medical_entities(cleaned_text)
+                urgency_level, urgency_confidence = self.classifier.get_document_urgency(cleaned_text)
+
+                # Extract key-value pairs from patient info segments
+                for segment in segments:
+                    if segment.segment_type == 'patient_info':
+                        kvp = self.segmenter.extract_key_value_pairs(segment)
+                        key_value_pairs.update(kvp)
+
+                # Display extracted information
+                if key_value_pairs:
+                    print("  📋 Patient Information:")
+                    for key, value in key_value_pairs.items():
+                        print(f"     {key.title()}: {value}")
+
+                # Show medical entities
+                entity_count = sum(len(entities) for entities in medical_entities.values())
+                if entity_count > 0:
+                    print(f"  💊 Medical Entities Found ({entity_count} total):")
+                    for entity_type, entities in medical_entities.items():
+                        if entities:
+                            print(f"     {entity_type.title()}: {', '.join(entities[:5])}")
+                            if len(entities) > 5:
+                                print(f"       ... and {len(entities) - 5} more")
+
+                # Urgency assessment
+                print(f"  ⚠️  Urgency Level: {urgency_level.title()} ({urgency_confidence:.1%})")
+
+                # Extract dates and other info
+                dates = self.text_processor.extract_dates(cleaned_text)
+                if dates:
+                    print(f"  📅 Dates Found: {', '.join(dates[:3])}")
+
+                page_results[page_name] = {
+                    'raw_text': page_text,
+                    'cleaned_text': cleaned_text,
+                    'text_length': len(cleaned_text),
+                    'segments_count': len(segments),
+                    'segments': segment_classifications,
+                    'overall_classification': {
+                        'document_type': page_classification.document_type,
+                        'confidence': page_classification.confidence,
+                        'secondary_types': page_classification.secondary_types
+                    },
+                    'medical_entities': medical_entities,
+                    'urgency_assessment': {
+                        'level': urgency_level,
+                        'confidence': urgency_confidence
+                    },
+                    'key_value_pairs': key_value_pairs,
+                    'dates_found': dates
+                }
+
+                all_segments.extend(segments)
+
+            results['pages'] = page_results
+
+            # Overall document classification (using all text)
+            if extracted_text:
+                combined_text = " ".join(extracted_text.values())
+                overall_classification = self.classifier.classify_document(combined_text)
+                results['overall_classification'] = {
+                    'document_type': overall_classification.document_type,
+                    'confidence': overall_classification.confidence,
+                    'secondary_types': overall_classification.secondary_types
+                }
+                print(f"\n🎯 FINAL DOCUMENT CLASSIFICATION:")
+                print(f"   Type: {overall_classification.document_type.replace('_', ' ').title()}")
+                print(f"   Confidence: {overall_classification.confidence:.1%}")
+
+            # Summary statistics
+            segment_summary = self.segmenter.get_segment_summary(all_segments)
+            results['segment_summary'] = segment_summary
+            results['total_segments'] = len(all_segments)
+
+            print(f"\n📊 PROCESSING SUMMARY:")
+            print(f"   Total Segments: {len(all_segments)}")
+            print(f"   Segment Types: {', '.join(segment_summary.keys())}")
+
+        except Exception as e:
+            error_msg = f"Error processing {Path(pdf_path).name}: {str(e)}"
+            print(f"❌ {error_msg}")
+            results['processing_errors'].append(error_msg)
+
+        return results
+
+    def process_image(self, image_path: str) -> Dict[str, Any]:
+        """
+        Process a single image through the complete pipeline.
+
+        Args:
+            image_path: Path to the image file
+
+        Returns:
+            Dictionary containing all processing results
+        """
+        print(f"\n🖼️  Processing Image: {Path(image_path).name}")
+        print("=" * 80)
+
+        results = {
+            'filename': Path(image_path).name,
+            'file_path': image_path,
+            'file_type': 'image',
+            'pages': {},
+            'overall_classification': None,
+            'processing_errors': []
+        }
+
+        try:
+            # Step 1: Extract text from image
+            extracted_text = self.ocr_extractor.extract_from_image(image_path)
+
+            if not extracted_text or not extracted_text.strip():
+                results['processing_errors'].append("No text extracted from image")
+                print("❌ No text extracted from image")
+                return results
+
+            print(f"✓ Text extraction successful from image")
+
+            # Process the extracted text (treating image as single page)
+            page_name = "image_content"
+
+            print(f"\n📑 IMAGE CONTENT")
+            print("-" * 80)
+
+            # Show the extracted text first
+            print("🔤 EXTRACTED TEXT:")
+            print("-" * 40)
+            print(extracted_text)
+            print("-" * 40)
+
+            # Step 2: Clean the text
+            cleaned_text = self.text_processor.clean_medical_text(extracted_text)
+
+            # Step 3: Segment the text
+            segments = self.segmenter.segment_document(cleaned_text)
+            print(f"\n🔍 SEGMENTATION ANALYSIS:")
+            print(f"Found {len(segments)} segments:")
+
+            # Show each segment
+            for i, segment in enumerate(segments, 1):
+                print(f"\n  📝 Segment {i}: {segment.segment_type.replace('_', ' ').title()}")
+                print(f"     Lines {segment.start_line}-{segment.end_line}")
+                print(f"     Content: {segment.content[:150]}{'...' if len(segment.content) > 150 else ''}")
+
+            # Step 4: Classify each segment and the whole image
+            print(f"\n🏷️  CLASSIFICATION RESULTS:")
+
+            segment_classifications = []
+            for i, segment in enumerate(segments, 1):
+                classification = self.classifier.classify_document(segment.content)
+                print(
+                    f"  Segment {i} ({segment.segment_type}): {classification.document_type} ({classification.confidence:.1%})")
+                if classification.keywords_found:
+                    print(f"    Keywords: {', '.join(classification.keywords_found[:5])}")
+
+                segment_classifications.append({
+                    'segment_type': segment.segment_type,
+                    'content_preview': segment.content[:200] + "..." if len(segment.content) > 200 else segment.content,
+                    'full_content': segment.content,
+                    'classification': {
+                        'document_type': classification.document_type,
+                        'confidence': classification.confidence,
+                        'keywords_found': classification.keywords_found
+                    },
+                    'start_line': segment.start_line,
+                    'end_line': segment.end_line
+                })
+
+            # Step 5: Get overall image classification
+            overall_classification = self.classifier.classify_document(cleaned_text)
+            print(
+                f"\n  📄 Overall Image Classification: {overall_classification.document_type.replace('_', ' ').title()}")
+            print(f"     Confidence: {overall_classification.confidence:.1%}")
+            if overall_classification.secondary_types:
+                print(
+                    f"     Secondary possibilities: {', '.join([f'{t[0]} ({t[1]:.1%})' for t in overall_classification.secondary_types[:2]])}")
+
+            # Step 6: Extract additional information
+            print(f"\n🏥 MEDICAL INFORMATION EXTRACTION:")
+
+            key_value_pairs = {}
+            medical_entities = self.classifier.extract_medical_entities(cleaned_text)
+            urgency_level, urgency_confidence = self.classifier.get_document_urgency(cleaned_text)
+
+            # Extract key-value pairs from patient info segments
+            for segment in segments:
+                if segment.segment_type == 'patient_info':
+                    kvp = self.segmenter.extract_key_value_pairs(segment)
+                    key_value_pairs.update(kvp)
+
+            # Display extracted information
+            if key_value_pairs:
+                print("  📋 Patient Information:")
+                for key, value in key_value_pairs.items():
+                    print(f"     {key.title()}: {value}")
+
+            # Show medical entities
+            entity_count = sum(len(entities) for entities in medical_entities.values())
+            if entity_count > 0:
+                print(f"  💊 Medical Entities Found ({entity_count} total):")
+                for entity_type, entities in medical_entities.items():
+                    if entities:
+                        print(f"     {entity_type.title()}: {', '.join(entities[:5])}")
+                        if len(entities) > 5:
+                            print(f"       ... and {len(entities) - 5} more")
+
+            # Urgency assessment
+            print(f"  ⚠️  Urgency Level: {urgency_level.title()} ({urgency_confidence:.1%})")
+
+            # Extract dates and other info
+            dates = self.text_processor.extract_dates(cleaned_text)
+            if dates:
+                print(f"  📅 Dates Found: {', '.join(dates[:3])}")
+
+            # Store results
+            results['pages'][page_name] = {
+                'raw_text': extracted_text,
+                'cleaned_text': cleaned_text,
+                'text_length': len(cleaned_text),
+                'segments_count': len(segments),
+                'segments': segment_classifications,
+                'overall_classification': {
+                    'document_type': overall_classification.document_type,
+                    'confidence': overall_classification.confidence,
+                    'secondary_types': overall_classification.secondary_types
+                },
+                'medical_entities': medical_entities,
+                'urgency_assessment': {
+                    'level': urgency_level,
+                    'confidence': urgency_confidence
+                },
+                'key_value_pairs': key_value_pairs,
+                'dates_found': dates
+            }
+
+            results['overall_classification'] = {
+                'document_type': overall_classification.document_type,
+                'confidence': overall_classification.confidence,
+                'secondary_types': overall_classification.secondary_types
+            }
+
+            # Summary statistics
+            segment_summary = self.segmenter.get_segment_summary(segments)
+            results['segment_summary'] = segment_summary
+            results['total_segments'] = len(segments)
+
+            print(f"\n🎯 FINAL IMAGE CLASSIFICATION:")
+            print(f"   Type: {overall_classification.document_type.replace('_', ' ').title()}")
+            print(f"   Confidence: {overall_classification.confidence:.1%}")
+
+            print(f"\n📊 PROCESSING SUMMARY:")
+            print(f"   Total Segments: {len(segments)}")
+            print(f"   Segment Types: {', '.join(segment_summary.keys())}")
+
+        except Exception as e:
+            error_msg = f"Error processing {Path(image_path).name}: {str(e)}"
+            print(f"❌ {error_msg}")
+            results['processing_errors'].append(error_msg)
+
+        return results
+
+    def process_all_files(self, sample_dir: Path):
+        """
+        Process all supported files (PDFs and images) in the sample directory.
+
+        Args:
+            sample_dir: Path to directory containing files
+
+        Returns:
+            List of processing results for each file
+        """
+        supported_exts = [".pdf", ".jpg", ".jpeg", ".png", ".bmp", ".tiff"]
+        files = [f for f in sample_dir.iterdir() if f.suffix.lower() in supported_exts]
+
+        if not files:
+            print(f"❌ No supported files found in {sample_dir}")
+            return []
+
+        print(f"🔍 Found {len(files)} supported file(s) to process:")
+        for file in files:
+            print(f"   - {file.name}")
+
+        all_results = []
+        for i, file in enumerate(files, 1):
+            print(f"\n{'=' * 80}")
+            print(f"PROCESSING FILE {i}/{len(files)}")
+            print(f"{'=' * 80}")
+
+            if file.suffix.lower() == ".pdf":
+                result = self.process_pdf(str(file))
+            else:
+                result = self.process_image(str(file))
+            all_results.append(result)
+
+        return all_results
+
+    def save_results(self, results: List[Dict[str, Any]], output_path: str):
+        """Save processing results to JSON file."""
+        try:
+            # Create output directory if it doesn't exist
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+            with open(output_path, 'w', encoding='utf-8') as f:
+                json.dump(results, f, indent=2, ensure_ascii=False)
+            print(f"💾 Detailed results saved to {output_path}")
+        except Exception as e:
+            print(f"❌ Failed to save results: {e}")
+
+    def print_final_summary(self, results: List[Dict[str, Any]]):
+        """Print a final summary of all processing results."""
+        print(f"\n{'=' * 80}")
+        print("FINAL PROCESSING SUMMARY")
+        print(f"{'=' * 80}")
+
+        if not results:
+            print("❌ No documents were processed successfully.")
+            return
+
+        successful_docs = [r for r in results if not r['processing_errors']]
+        failed_docs = [r for r in results if r['processing_errors']]
+
+        print(f"📊 Total Files: {len(results)}")
+        print(f"✅ Successfully Processed: {len(successful_docs)}")
+        print(f"❌ Failed: {len(failed_docs)}")
+
+        if failed_docs:
+            print(f"\n❌ FAILED FILES:")
+            for doc in failed_docs:
+                file_type = "PDF" if doc.get('file_type') != 'image' else "Image"
+                print(f"   - {doc['filename']} ({file_type}): {', '.join(doc['processing_errors'])}")
+
+        if successful_docs:
+            print(f"\n✅ SUCCESSFULLY PROCESSED:")
+
+            # Document type summary
+            doc_types = {}
+            total_segments = 0
+            total_entities = 0
+
+            for doc in successful_docs:
+                if doc['overall_classification']:
+                    doc_type = doc['overall_classification']['document_type']
+                    doc_types[doc_type] = doc_types.get(doc_type, 0) + 1
+
+                total_segments += doc.get('total_segments', 0)
+
+                # Count medical entities
+                for page_data in doc['pages'].values():
+                    entities = page_data.get('medical_entities', {})
+                    total_entities += sum(len(ent_list) for ent_list in entities.values())
+
+            print(f"\n📋 Document Types Found:")
+            for doc_type, count in doc_types.items():
+                print(f"   - {doc_type.replace('_', ' ').title()}: {count}")
+
+            print(f"\n📊 Processing Statistics:")
+            print(f"   - Total Segments Identified: {total_segments}")
+            print(f"   - Total Medical Entities Found: {total_entities}")
+
+            # Show details for each successful document
+            for doc in successful_docs:
+                print(f"\n📄 {doc['filename']}:")
+                if doc['overall_classification']:
+                    cls = doc['overall_classification']
+                    print(f"   Type: {cls['document_type'].replace('_', ' ').title()} ({cls['confidence']:.1%})")
+
+                print(f"   Pages: {len(doc['pages'])}")
+                print(f"   Segments: {doc.get('total_segments', 0)}")
+
+                # Show segment breakdown
+                if doc.get('segment_summary'):
+                    segment_types = list(doc['segment_summary'].keys())[:3]  # Show top 3
+                    if segment_types:
+                        print(f"   Main Sections: {', '.join(s.replace('_', ' ').title() for s in segment_types)}")
 
 
-def check_python_dependencies() -> Tuple[bool, List[str]]:
-    """Enhanced dependency checking with version info."""
-    print("\nChecking Python Dependencies...")
+def check_dependencies():
+    """Check if all required packages are installed."""
+    print("🔍 Checking Dependencies...")
     print("-" * 50)
 
     required_packages = [
-        ('cv2', 'opencv-python'),
-        ('pytesseract', 'pytesseract'),
-        ('pdf2image', 'pdf2image'),
-        ('PIL', 'Pillow'),
-        ('numpy', 'numpy')
+        'cv2', 'pytesseract', 'pdf2image', 'PIL', 'numpy'
     ]
 
     missing_packages = []
-    all_good = True
 
-    for module, package in required_packages:
+    for package in required_packages:
         try:
-            if module == 'PIL':
+            if package == 'PIL':
                 import PIL
-                version = PIL.__version__
-            elif module == 'cv2':
+            elif package == 'cv2':
                 import cv2
-                version = cv2.__version__
-            elif module == 'pytesseract':
+            elif package == 'pytesseract':
                 import pytesseract
-                version = getattr(pytesseract, '__version__', 'unknown')
-            elif module == 'pdf2image':
+            elif package == 'pdf2image':
                 import pdf2image
-                version = getattr(pdf2image, '__version__', 'unknown')
-            elif module == 'numpy':
+            elif package == 'numpy':
                 import numpy
-                version = numpy.__version__
 
-            print(ColoredOutput.success(f"{module} v{version}"))
+            print(f"✓ {package}")
 
-        except ImportError as e:
-            print(ColoredOutput.error(f"{module} ({package}) - NOT INSTALLED"))
-            print(f"  Error: {str(e)}")
+        except ImportError:
+            print(f"❌ {package} - NOT INSTALLED")
             missing_packages.append(package)
-            all_good = False
-        except Exception as e:
-            print(ColoredOutput.warning(f"{module} - Installed but issue: {str(e)}"))
 
     if missing_packages:
-        print(f"\n{ColoredOutput.error('Missing packages:')} {', '.join(missing_packages)}")
-        print(f"{ColoredOutput.info('Install with:')} pip install {' '.join(missing_packages)}")
-
-    return all_good, missing_packages
-
-
-def test_ocr_import() -> bool:
-    """Test if our OCR extractor can be imported."""
-    print("\nTesting OCR Extractor Import...")
-    print("-" * 50)
-
-    try:
-        from src.ocr.extractor import OCRExtractor
-        extractor = OCRExtractor()
-        print(ColoredOutput.success("OCR Extractor imported and initialized"))
+        print(f"\n❌ Missing packages: {', '.join(missing_packages)}")
+        print("Install with: pip install -r requirements.txt")
+        return False
+    else:
+        print("\n✅ All dependencies installed!")
         return True
-    except ImportError as e:
-        print(ColoredOutput.error(f"Cannot import OCRExtractor: {str(e)}"))
-        print(ColoredOutput.info("Check that src/ocr/extractor.py exists and is correct"))
-        return False
-    except Exception as e:
-        print(ColoredOutput.error(f"Error initializing OCRExtractor: {str(e)}"))
-        print(f"Full error:\n{traceback.format_exc()}")
-        return False
-
-
-def find_test_files(sample_dir: Path) -> Dict[str, List[Path]]:
-    """Find and categorize test files."""
-    if not sample_dir.exists():
-        print(ColoredOutput.warning(f"Sample directory doesn't exist: {sample_dir}"))
-        sample_dir.mkdir(parents=True, exist_ok=True)
-        print(ColoredOutput.success(f"Created directory: {sample_dir}"))
-        return {"pdf": [], "images": []}
-
-    # Find files
-    pdf_files = list(sample_dir.glob("*.pdf")) + list(sample_dir.glob("*.PDF"))
-    image_extensions = ["*.jpg", "*.jpeg", "*.png", "*.bmp", "*.tiff", "*.gif"]
-    image_files = []
-
-    for ext in image_extensions:
-        image_files.extend(sample_dir.glob(ext))
-        image_files.extend(sample_dir.glob(ext.upper()))
-
-    return {"pdf": pdf_files, "images": image_files}
-
-
-def process_single_file(file_path: Path, extractor) -> Dict:
-    """Process a single file with detailed error reporting."""
-    start_time = time.time()
-    result = {
-        "filename": file_path.name,
-        "path": str(file_path),
-        "success": False,
-        "error": None,
-        "processing_time": 0,
-        "text_length": 0,
-        "page_count": 0,
-        "preview": ""
-    }
-
-    try:
-        if file_path.suffix.lower() in ['.pdf']:
-            print(f"  📄 Processing PDF: {file_path.name}")
-            extracted_data = extractor.extract_from_pdf(str(file_path))
-
-            if isinstance(extracted_data, dict):
-                all_text = '\n'.join(extracted_data.values())
-                result["page_count"] = len(extracted_data)
-            else:
-                all_text = str(extracted_data)
-                result["page_count"] = 1
-
-        else:
-            print(f"  🖼️  Processing Image: {file_path.name}")
-            all_text = extractor.extract_from_image(str(file_path))
-            result["page_count"] = 1
-
-        # Process results
-        result["text_length"] = len(all_text)
-        result["preview"] = all_text[:200] + ("..." if len(all_text) > 200 else "")
-        result["success"] = True
-
-    except Exception as e:
-        result["error"] = str(e)
-        print(f"    {ColoredOutput.error('Failed')}: {str(e)}")
-
-    result["processing_time"] = time.time() - start_time
-    return result
-
-
-def process_files_parallel(files: List[Path], extractor, max_workers: int = 3) -> List[Dict]:
-    """Process multiple files in parallel."""
-    if len(files) <= 1:
-        return [process_single_file(files[0], extractor)] if files else []
-
-    print(f"\n🚀 Processing {len(files)} files with {max_workers} workers...")
-
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        results = list(executor.map(lambda f: process_single_file(f, extractor), files))
-
-    return results
-
-
-def generate_detailed_report(results: List[Dict]):
-    """Generate a comprehensive report."""
-    if not results:
-        print(ColoredOutput.warning("No files were processed"))
-        return
-
-    print(f"\n{'=' * 70}")
-    print(f"{ColoredOutput.info('OCR PROCESSING RESULTS')}")
-    print(f"{'=' * 70}")
-
-    successful = [r for r in results if r["success"]]
-    failed = [r for r in results if not r["success"]]
-
-    # Summary statistics
-    total_time = sum(r["processing_time"] for r in results)
-    total_text = sum(r["text_length"] for r in successful)
-    total_pages = sum(r["page_count"] for r in successful)
-
-    print(f"\n📊 SUMMARY:")
-    print(f"  Total files: {len(results)}")
-    print(f"  {ColoredOutput.success(f'Successful: {len(successful)}')} ")
-    print(f"  {ColoredOutput.error(f'Failed: {len(failed)}')} ")
-    print(f"  Total processing time: {total_time:.2f}s")
-    print(f"  Average time per file: {total_time / len(results):.2f}s")
-    print(f"  Total pages processed: {total_pages}")
-    print(f"  Total text extracted: {total_text:,} characters")
-
-    if successful:
-        avg_chars = total_text / len(successful)
-        print(f"  Average text per file: {avg_chars:.0f} characters")
-
-    # Detailed results
-    print(f"\n📋 DETAILED RESULTS:")
-    print("-" * 70)
-
-    for i, result in enumerate(results, 1):
-        status_icon = "✅" if result["success"] else "❌"
-        print(f"\n{i}. {status_icon} {result['filename']}")
-        print(f"   ⏱️  Processing time: {result['processing_time']:.2f}s")
-
-        if result["success"]:
-            print(f"   📄 Pages: {result['page_count']}")
-            print(f"   📝 Text length: {result['text_length']:,} characters")
-
-            if result["preview"]:
-                print(f"   👀 Preview:")
-                # Indent the preview text
-                preview_lines = result["preview"].split('\n')
-                for line in preview_lines[:3]:  # Show max 3 lines
-                    if line.strip():
-                        print(f"      {line.strip()}")
-                if len(preview_lines) > 3:
-                    print("      ...")
-        else:
-            print(f"   {ColoredOutput.error('Error')}: {result['error']}")
-
-    # Performance insights
-    if successful:
-        fastest = min(successful, key=lambda x: x["processing_time"])
-        slowest = max(successful, key=lambda x: x["processing_time"])
-
-        print(f"\n🏆 PERFORMANCE INSIGHTS:")
-        print(f"   Fastest: {fastest['filename']} ({fastest['processing_time']:.2f}s)")
-        print(f"   Slowest: {slowest['filename']} ({slowest['processing_time']:.2f}s)")
-
-        if total_pages > 0:
-            print(f"   Pages per second: {total_pages / total_time:.1f}")
 
 
 def main():
-    """Main enhanced test function."""
-    print(f"{ColoredOutput.info('Medical Document AI - Enhanced OCR Test')}")
-    print("=" * 60)
+    """Main function to run the enhanced OCR pipeline."""
+    print("🏥 Medical Document AI - Enhanced Processing Pipeline")
+    print("=" * 80)
 
-    # Step 1: Check system dependencies
-    system_ok = check_system_dependencies()
+    # Check dependencies first
+    if not check_dependencies():
+        print("\n❌ Please install missing dependencies before running the pipeline.")
+        return
 
-    # Step 2: Check Python dependencies
-    python_ok, missing = check_python_dependencies()
+    print()
 
-    if not (system_ok and python_ok):
-        print(f"\n{ColoredOutput.error('Dependencies not satisfied. Please install missing components.')}")
-        return False
-
-    # Step 3: Test OCR extractor import
-    if not test_ocr_import():
-        return False
-
-    # Step 4: Find test files
-    sample_dir = Path("data/sample")
-    files = find_test_files(sample_dir)
-    total_files = len(files["pdf"]) + len(files["images"])
-
-    print(f"\n🔍 File Discovery:")
-    print(f"   PDF files: {len(files['pdf'])}")
-    print(f"   Image files: {len(files['images'])}")
-    print(f"   Total: {total_files}")
-
-    if total_files == 0:
-        print(f"\n{ColoredOutput.warning('No test files found!')}")
-        print(f"Add PDF or image files to: {sample_dir}")
-        return False
-
-    # Step 5: Process files
+    # Initialize processor
     try:
-        from src.ocr.extractor import OCRExtractor
-        extractor = OCRExtractor()
-
-        all_files = files["pdf"] + files["images"]
-        start_time = time.time()
-
-        # Process files (use parallel processing if more than 2 files)
-        if len(all_files) > 2:
-            results = process_files_parallel(all_files, extractor, max_workers=3)
-        else:
-            results = [process_single_file(f, extractor) for f in all_files]
-
-        total_time = time.time() - start_time
-
-        # Step 6: Generate report
-        generate_detailed_report(results)
-
-        print(f"\n🏁 {ColoredOutput.success('Test completed!')} Total time: {total_time:.2f}s")
-        return True
-
+        processor = MedicalDocumentProcessor()
     except Exception as e:
-        print(f"\n{ColoredOutput.error('Unexpected error during testing:')}")
-        print(f"{traceback.format_exc()}")
-        return False
+        print(f"❌ Failed to initialize processor: {e}")
+        return
+
+    # Setup directories
+    sample_dir = Path("data/sample")
+    if not sample_dir.exists():
+        print("⚠️  Creating data/sample directory...")
+        sample_dir.mkdir(parents=True, exist_ok=True)
+        print("✅ Created data/sample directory")
+        print("❌ No supported files found to process. Add files to data/sample/ and run again.")
+        print("📁 Supported formats: PDF, JPG, JPEG, PNG, BMP, TIFF")
+        return
+
+    # Process all files (PDFs and Images)
+    results = processor.process_all_files(sample_dir)
+
+    if not results:
+        print("❌ No supported files found to process.")
+        print("📁 Add PDF, JPG, PNG, or other image files to data/sample/")
+        return
+
+    # Save detailed results
+    output_file = "data/processing_results.json"
+    processor.save_results(results, output_file)
+
+    # Print final summary
+    processor.print_final_summary(results)
+
+    print(f"\n🎉 Processing complete! Check {output_file} for detailed results.")
 
 
 if __name__ == "__main__":
-    try:
-        success = main()
-        if not success:
-            sys.exit(1)
-    except KeyboardInterrupt:
-        print(f"\n{ColoredOutput.warning('Test interrupted by user')}")
-    except Exception as e:
-        print(f"\n{ColoredOutput.error('Critical error:')}: {str(e)}")
-        sys.exit(1)
+    main()

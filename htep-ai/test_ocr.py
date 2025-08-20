@@ -5,9 +5,11 @@ import sys
 from pathlib import Path
 
 # Add src to path so we can import our modules
-sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
+src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'src'))
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
 
-from ocr.extractor import OCRExtractor
+from src.ocr.extractor import OCRExtractor
 
 
 def test_ocr_setup():

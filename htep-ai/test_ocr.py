@@ -5,9 +5,11 @@ import sys
 from pathlib import Path
 
 # Add src to path so we can import our modules
-sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
+src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'src'))
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
 
-from ocr.extractor import OCRExtractor
+from src.ocr.extractor import OCRExtractor
 
 
 def test_ocr_setup():
@@ -18,13 +20,13 @@ def test_ocr_setup():
     try:
         # Initialize OCR extractor
         extractor = OCRExtractor()
-        print("✓ OCR Extractor initialized successfully")
+        print("OCR Extractor initialized successfully")
 
         # Test with a simple image (you'll need to add a test image)
         sample_dir = Path("data/sample")
 
         if not sample_dir.exists():
-            print("⚠ Warning: data/sample directory doesn't exist")
+            print("Warning: data/sample directory doesn't exist")
             sample_dir.mkdir(parents=True, exist_ok=True)
             print("✓ Created data/sample directory")
 
@@ -39,7 +41,7 @@ def test_ocr_setup():
 
             try:
                 result = extractor.extract_from_pdf(str(test_pdf))
-                print(f"✓ Successfully extracted text from {len(result)} page(s)")
+                print(f"Successfully extracted text from {len(result)} page(s)")
 
                 # Show preview of first page
                 first_page = list(result.keys())[0]
@@ -49,7 +51,7 @@ def test_ocr_setup():
                 print(preview)
 
             except Exception as e:
-                print(f"✗ Error processing PDF: {e}")
+                print(f"Error processing PDF: {e}")
 
         elif image_files:
             print(f"Found {len(image_files)} image file(s)")
@@ -58,7 +60,7 @@ def test_ocr_setup():
 
             try:
                 result = extractor.extract_from_image(str(test_image))
-                print("✓ Successfully extracted text from image")
+                print("Successfully extracted text from image")
 
                 preview = result[:200] + "..." if len(result) > 200 else result
                 print(f"\nExtracted text preview:")
@@ -69,14 +71,14 @@ def test_ocr_setup():
                 print(f"✗ Error processing image: {e}")
 
         else:
-            print("⚠ No PDF or image files found in data/sample/")
+            print("No PDF or image files found in data/sample/")
             print("Add some sample files to test OCR functionality")
 
         print("\n" + "=" * 50)
         print("OCR Test Complete!")
 
     except ImportError as e:
-        print(f"✗ Import error: {e}")
+        print(f"Import error: {e}")
         print("Make sure you've installed all requirements:")
         print("pip install -r requirements.txt")
     except Exception as e:
@@ -107,10 +109,10 @@ def check_dependencies():
             elif package == 'numpy':
                 import numpy
 
-            print(f"✓ {package}")
+            print(f"{package}")
 
         except ImportError:
-            print(f"✗ {package} - NOT INSTALLED")
+            print(f"{package} - NOT INSTALLED")
             missing_packages.append(package)
 
     if missing_packages:

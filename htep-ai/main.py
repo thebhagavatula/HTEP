@@ -61,7 +61,7 @@ class MedicalDocumentPipeline:
 
             # Combine all pages
             full_text = '\n\n'.join(ocr_results.values())
-            print(f"   ✓ Extracted {len(full_text)} characters from {len(ocr_results)} page(s)")
+            print(f"   Extracted {len(full_text)} characters from {len(ocr_results)} page(s)")
 
             # Step 2: Document Segmentation
             print("2. Segmenting document...")
@@ -78,7 +78,7 @@ class MedicalDocumentPipeline:
             ]
 
             segment_summary = self.segmenter.get_segment_summary(segments)
-            print(f"   ✓ Found {len(segments)} segments: {segment_summary}")
+            print(f"   Found {len(segments)} segments: {segment_summary}")
 
             # Step 3: Document Classification
             print("3. Classifying document...")
@@ -90,7 +90,7 @@ class MedicalDocumentPipeline:
                 'keywords_found': classification.keywords_found
             }
 
-            print(f"   ✓ Classified as: {classification.document_type} "
+            print(f"   Classified as: {classification.document_type} "
                   f"(confidence: {classification.confidence:.2f})")
 
             # Step 4: Extract additional insights
@@ -113,7 +113,7 @@ class MedicalDocumentPipeline:
             processing_time = time.time() - start_time
             results['processing_time'] = processing_time
 
-            print(f"✓ Processing completed in {processing_time:.2f} seconds")
+            print(f"Processing completed in {processing_time:.2f} seconds")
             print("\nSUMMARY:")
             print(f"  Document Type: {classification.document_type}")
             print(f"  Segments: {len(segments)}")

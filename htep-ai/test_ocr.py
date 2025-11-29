@@ -68,7 +68,7 @@ def test_ocr_setup():
                 print(preview)
 
             except Exception as e:
-                print(f"✗ Error processing image: {e}")
+                print(f"Error processing image: {e}")
 
         else:
             print("No PDF or image files found in data/sample/")

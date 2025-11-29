@@ -121,7 +121,7 @@ class MedicalDocumentPipeline:
             print(f"  Entities found: {sum(len(v) for v in entities.values())}")
 
         except Exception as e:
-            print(f"✗ Error processing document: {str(e)}")
+            print(f"Error processing document: {str(e)}")
             results['error'] = str(e)
 
         return results

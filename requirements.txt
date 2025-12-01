@@ -2,14 +2,14 @@
 opencv-python==4.12.0.88
 pytesseract==0.3.10
 pdf2image==1.16.3
-Pillow==10.0.0
-
+# Pillow (use a version compatible with Python 3.13)
+Pillow
 # Data Processing
-pandas==2.0.3
-numpy==1.24.3
+pandas
+numpy
 
 # Machine Learning (for future classification)
-scikit-learn==1.7.1
+scikit-learn
 
 # Text Processing
 nltk==3.9.1

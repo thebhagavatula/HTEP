@@ -36,39 +36,39 @@ def test_ocr_setup():
 
         if pdf_files:
             print(f"Found {len(pdf_files)} PDF file(s)")
-            test_pdf = pdf_files[0]
-            print(f"Testing with: {test_pdf}")
+            for test_pdf in pdf_files:
+                print(f"Testing with: {test_pdf}")
+                try:
+                    result = extractor.extract_from_pdf(str(test_pdf))
+                    print(f"Successfully extracted text from {len(result)} page(s)")
 
-            try:
-                result = extractor.extract_from_pdf(str(test_pdf))
-                print(f"Successfully extracted text from {len(result)} page(s)")
+                    # Show preview of first page
+                    first_page = list(result.keys())[0]
+                    preview = result[first_page][:200] + "..." if len(result[first_page]) > 200 else result[first_page]
+                    print(f"\nPreview of {first_page}:")
+                    print("-" * 30)
+                    print(preview)
+                    print("\n" + ("=" * 40) + "\n")
 
-                # Show preview of first page
-                first_page = list(result.keys())[0]
-                preview = result[first_page][:200] + "..." if len(result[first_page]) > 200 else result[first_page]
-                print(f"\nPreview of {first_page}:")
-                print("-" * 30)
-                print(preview)
-
-            except Exception as e:
-                print(f"Error processing PDF: {e}")
+                except Exception as e:
+                    print(f"Error processing PDF {test_pdf}: {e}")
 
         elif image_files:
             print(f"Found {len(image_files)} image file(s)")
-            test_image = image_files[0]
-            print(f"Testing with: {test_image}")
+            for test_image in image_files:
+                print(f"Testing with: {test_image}")
+                try:
+                    result = extractor.extract_from_image(str(test_image))
+                    print("Successfully extracted text from image")
 
-            try:
-                result = extractor.extract_from_image(str(test_image))
-                print("Successfully extracted text from image")
+                    preview = result[:200] + "..." if len(result) > 200 else result
+                    print(f"\nExtracted text preview:")
+                    print("-" * 30)
+                    print(preview)
+                    print("\n" + ("=" * 40) + "\n")
 
-                preview = result[:200] + "..." if len(result) > 200 else result
-                print(f"\nExtracted text preview:")
-                print("-" * 30)
-                print(preview)
-
-            except Exception as e:
-                print(f"Error processing image: {e}")
+                except Exception as e:
+                    print(f"Error processing image {test_image}: {e}")
 
         else:
             print("No PDF or image files found in data/sample/")

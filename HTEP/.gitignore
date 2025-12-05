@@ -1,0 +1,131 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# PyCharm
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+
+# Data Files (IMPORTANT for medical data)
+data/raw/
+data/processed/
+*.pdf
+*.jpg
+*.jpeg
+*.png
+*.tiff
+*.dcm
+*.dicom
+
+# Keep sample data structure but not actual files
+!data/sample/.gitkeep
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Model Files (can be large)
+models/
+*.pkl
+*.joblib
+*.h5
+*.onnx
+*.pt
+*.pth
+*.model
+
+# Logs
+*.log
+logs/
+log/
+
+# Environment Variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# API Keys and Secrets
+secrets.json
+credentials.json
+service_account.json
+config_local.py
+
+# Temporary Files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# OS Generated Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# OCR Output Cache
+ocr_cache/
+*.ocr
+
+# Testing
+.coverage
+.pytest_cache/
+.tox/
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# Documentation builds
+docs/_build/
+site/
+
+# Database
+*.db
+*.sqlite3
+
+# Large datasets/archives
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# Backup files
+*.bak
+*.backup
+*~

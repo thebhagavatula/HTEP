@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTEP - Home</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+
+    <!-- Header / Nav -->
+    <nav>
+        <a href="index.html" class="logo">HTEP</a>
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="about.html">About</a></li>
+        </ul>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container">
+        <h1>Healthcare Text Extraction Platform</h1>
+        <p class="subtitle">Upload clear images for best results</p>
+
+        <span class="upload-label-text">Supports: PDF, JPEG, PNG - Max 5 MB</span>
+        
+        <div class="upload-box">
+            <!-- Icon -->
+             <div class="upload-icon">
+                <!-- Updated: Using local SVG instead of FontAwesome -->
+                <img src="assets/upload.svg" alt="Upload" style="width: 50px; height: auto;">
+            </div>
+            
+            <!-- Hidden File Input -->
+            <input type="file" id="pdfInput" accept=".pdf,.png,.jpeg,.jpg" style="display: none;">
+            
+            <!-- Custom Button triggers file input -->
+            <button class="btn" id="uploadTriggerBtn">Click to upload image</button>
+            
+            <p id="fileNameDisplay" style="margin-top: 15px; font-size: 0.9rem; color: #2c3e50; font-weight: bold;"></p>
+            
+            <div id="loader" class="loader"></div>
+        </div>
+
+        <!-- Extract Button (Appears after file selection) -->
+        <div style="margin-top: 20px;">
+            <button id="extractBtn" class="btn" style="display: none;">Start Extraction</button>
+            <p id="statusMessage" style="color: red; margin-top: 10px;"></p>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2025 HTEP Platform</p>
+    </footer>
+
+    <!-- Link to external JS -->
+    <script src="app.js"></script>
+</body>
+</html>

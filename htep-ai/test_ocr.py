@@ -82,7 +82,7 @@ def test_ocr_setup():
         print("Make sure you've installed all requirements:")
         print("pip install -r requirements.txt")
     except Exception as e:
-        print(f"✗ Unexpected error: {e}")
+        print(f"Unexpected error: {e}")
 
 
 def check_dependencies():

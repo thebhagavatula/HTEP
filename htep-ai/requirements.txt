@@ -45,9 +45,6 @@ pytest-cov==6.0.0
 python-magic==0.4.27  # File type detection
 chardet==5.2.0  # Character encoding detection
 
-# Concurrent processing
-concurrent-futures==3.0.5  # Backport for older Python
-
 # JSON and data handling
 jsonschema==4.23.0
 

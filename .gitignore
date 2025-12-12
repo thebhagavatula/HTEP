@@ -40,15 +40,17 @@ venv.bak/
 .ipynb_checkpoints
 
 # Data Files (IMPORTANT for medical data)
-data/raw/
-data/processed/
-*.pdf
-*.jpg
-*.jpeg
-*.png
-*.tiff
-*.dcm
-*.dicom
+# data/raw/
+# data/processed/
+# *.pdf
+# *.jpg
+# *.jpeg
+# *.png
+# *.tiff
+# *.dcm
+# *.dicom
+
+data/datasets/
 
 # Keep sample data structure but not actual files
 !data/sample/.gitkeep
@@ -56,14 +58,14 @@ data/processed/
 !data/processed/.gitkeep
 
 # Model Files (can be large)
-models/
-*.pkl
-*.joblib
-*.h5
-*.onnx
-*.pt
-*.pth
-*.model
+# models/
+# *.pkl
+# *.joblib
+# *.h5
+# *.onnx
+# *.pt
+# *.pth
+# *.model
 
 # Logs
 *.log

@@ -1,0 +1,37 @@
+[
+  {
+    "file": "data\\icr_training\\scanned\\A.png",
+    "character": "A",
+    "confidence": 0.9999958276748657
+  },
+  {
+    "file": "data\\icr_training\\scanned\\B.png",
+    "character": "B",
+    "confidence": 0.9999998807907104
+  },
+  {
+    "file": "data\\icr_training\\scanned\\Big_A.png",
+    "character": "A",
+    "confidence": 0.9999943971633911
+  },
+  {
+    "file": "data\\icr_training\\scanned\\C.png",
+    "character": "C",
+    "confidence": 0.9999947547912598
+  },
+  {
+    "file": "data\\icr_training\\scanned\\D.png",
+    "character": "D",
+    "confidence": 0.9996141195297241
+  },
+  {
+    "file": "data\\icr_training\\scanned\\E.png",
+    "character": "E",
+    "confidence": 0.9965176582336426
+  },
+  {
+    "file": "data\\icr_training\\scanned\\F.png",
+    "character": "F",
+    "confidence": 0.9837988615036011
+  }
+]

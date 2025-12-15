@@ -185,8 +185,6 @@ def preprocess_single_char(img, target_size=(28, 28),
     
     return final
 
-
-
 # -------- PROCESS ALL IMAGES -------- #
 
 results = []

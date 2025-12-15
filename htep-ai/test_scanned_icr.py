@@ -179,7 +179,7 @@ def preprocess_single_char(img, target_size=(28, 28),
 
 
 
-# -------- PROCESS ALL IMAGES -------- #
+# ------- PROCESS ALL IMAGES ------- #
 
 results = []
 

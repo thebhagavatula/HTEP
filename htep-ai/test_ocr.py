@@ -1,6 +1,8 @@
 # test_ocr.py - Run this to test your OCR setup
 
 import os
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+
 import sys
 from pathlib import Path
 

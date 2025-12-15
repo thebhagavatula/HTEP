@@ -1,5 +1,8 @@
 # test_word_icr.py
 
+import os
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+
 import cv2
 import numpy as np
 from pathlib import Path

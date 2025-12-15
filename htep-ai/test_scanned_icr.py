@@ -1,5 +1,8 @@
 # scripts/test_scanned_icr_preproc.py
 
+import os
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+
 from pathlib import Path
 import json
 import cv2

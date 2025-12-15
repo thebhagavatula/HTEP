@@ -171,33 +171,12 @@ def preprocess_single_char(img, target_size=(28, 28),
     if ch == 0 or cw == 0:
         return np.ones(target_size, dtype=np.uint8) * 255
 
-    # Resize and pad
-    th, tw = target_size
-    scale = min(tw / cw, th / ch)
+    # Force resize
+    final = cv2.resize(crop, target_size, interpolation=cv2.INTER_AREA)
 
-    new_w = max(1, int(cw * scale))
-    new_h = max(1, int(ch * scale))
-
-    resized = cv2.resize(crop, (new_w, new_h), interpolation=cv2.INTER_AREA)
-
-    pad_w = tw - new_w
-    pad_h = th - new_h
-
-    top = pad_h // 2
-    bottom = pad_h - top
-    left = pad_w // 2
-    right = pad_w - left
-
-    final = cv2.copyMakeBorder(
-        resized, top, bottom, left, right,
-        borderType=cv2.BORDER_CONSTANT, value=255
-    )
-
-    _, final = cv2.threshold(
-        final, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
-    )
-
+    _, final = cv2.threshold(final, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     return final
+
 
 
 # -------- PROCESS ALL IMAGES -------- #

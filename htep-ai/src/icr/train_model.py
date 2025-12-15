@@ -61,7 +61,7 @@ class ICRTrainer:
             self.img_height = self.metadata['image_height']
         else:
             print("⚠ Metadata not found. Using defaults.")
-            self.characters = list("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+            self.characters = list("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ")
             self.img_width = 28
             self.img_height = 28
 
@@ -90,10 +90,15 @@ class ICRTrainer:
         X_train = X_train.astype('float32') / 255.0
         X_test = X_test.astype('float32') / 255.0
 
+        print("Classes seen:", sorted(set(y_train)))
+
+
         return X_train, y_train_encoded, X_test, y_test_encoded
 
-    def _load_data_from_dir(self, directory: Path) -> Tuple[np.ndarray, List[str]]:
-        """Load all images and labels from directory."""
+    def _load_data_from_dir(self, directory: Path):
+        print("🔥 USING UPDATED LOADER 🔥")
+        print("Directory being read:", directory)
+
         images = []
         labels = []
 
@@ -103,15 +108,23 @@ class ICRTrainer:
 
             char = char_dir.name
 
-            # Load all images for this character
-            for img_file in char_dir.glob("*.png"):
+            # ✅ THIS LOOP MUST BE INSIDE
+            for img_file in char_dir.iterdir():
+                if img_file.suffix.lower() not in (".png", ".jpg", ".jpeg", ".bmp"):
+                    continue
+
                 img = cv2.imread(str(img_file), cv2.IMREAD_GRAYSCALE)
+                if img is None:
+                    continue
 
-                if img is not None:
-                    images.append(img)
-                    labels.append(char)
+                img = cv2.resize(img, (self.img_width, self.img_height))
 
-        return np.array(images), labels
+                images.append(img)
+                labels.append(char)
+
+        return np.array(images, dtype=np.uint8), labels
+
+
 
     def build_cnn_model(self) -> models.Sequential:
         """

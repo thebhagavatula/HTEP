@@ -33,8 +33,8 @@ def segment_characters(word_img):
         gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
     )
 
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-    thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=1)
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
+    thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN,    kernel, iterations=1)
 
     contours, _ = cv2.findContours(
         thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
@@ -43,12 +43,73 @@ def segment_characters(word_img):
     boxes = []
     for c in contours:
         x, y, w, h = cv2.boundingRect(c)
-        if w * h > 200:
+        if w * h > 400:
             boxes.append((x, y, w, h))
 
     boxes.sort(key=lambda b: b[0])
 
     return [word_img[y:y+h, x:x+w] for (x, y, w, h) in boxes]
+
+# def segment_characters_model_aligned(word_img):
+#     gray = cv2.cvtColor(word_img, cv2.COLOR_BGR2GRAY)
+#
+#     # Use OTSU (global, stable)
+#     _, thresh = cv2.threshold(
+#         gray, 0, 255,
+#         cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
+#     )
+#
+#     # Stroke-width–aware kernel
+#     dist = cv2.distanceTransform(thresh, cv2.DIST_L2, 5)
+#     stroke_width = int(np.percentile(dist[dist > 0], 75))
+#
+#     kernel_size = max(1, stroke_width // 2)
+#     kernel = cv2.getStructuringElement(
+#         cv2.MORPH_RECT, (kernel_size, kernel_size)
+#     )
+#
+#     thresh = cv2.morphologyEx(
+#         thresh, cv2.MORPH_OPEN, kernel, iterations=1
+#     )
+#
+#     contours, _ = cv2.findContours(
+#         thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+#     )
+#
+#     areas = np.array([cv2.contourArea(c) for c in contours])
+#     if len(areas) == 0:
+#         return []
+#
+#     min_area = np.percentile(areas, 20)
+#
+#     boxes = []
+#     for c in contours:
+#         x, y, w, h = cv2.boundingRect(c)
+#         if cv2.contourArea(c) >= min_area:
+#             boxes.append((x, y, w, h))
+#
+#     boxes.sort(key=lambda b: b[0])
+#
+#     return [word_img[y:y+h, x:x+w] for (x, y, w, h) in boxes]
+
+# --------------------------------------------------
+# NORMALIZATION CONTRACT
+# --------------------------------------------------
+
+def normalize_char(img, target=32):
+    h, w = img.shape[:2]
+    scale = target / max(h, w)
+    resized = cv2.resize(img, None, fx=scale, fy=scale)
+
+    canvas = np.zeros((target, target), dtype=resized.dtype)
+    y_off = (target - resized.shape[0]) // 2
+    x_off = (target - resized.shape[1]) // 2
+
+    canvas[y_off:y_off+resized.shape[0],
+           x_off:x_off+resized.shape[1]] = resized
+
+    return canvas
+
 
 # --------------------------------------------------
 # LIGHT PREPROCESS (NO RE-CROPPING)

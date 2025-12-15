@@ -58,14 +58,14 @@ data/datasets/
 !data/processed/.gitkeep
 
 # Model Files (can be large)
-# models/
-# *.pkl
-# *.joblib
-# *.h5
-# *.onnx
-# *.pt
-# *.pth
-# *.model
+models/
+*.pkl
+*.joblib
+*.h5
+*.onnx
+*.pt
+*.pth
+*.model
 
 # Logs
 *.log

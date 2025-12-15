@@ -1,37 +1,52 @@
 [
   {
-    "file": "data\\icr_training\\scanned\\A.png",
+    "file": "data\\icr_training\\scanned\\letters\\A.png",
     "character": "A",
-    "confidence": 0.9999958276748657
+    "confidence": 0.9999996423721313
   },
   {
-    "file": "data\\icr_training\\scanned\\B.png",
+    "file": "data\\icr_training\\scanned\\letters\\B.png",
     "character": "B",
     "confidence": 0.9999998807907104
   },
   {
-    "file": "data\\icr_training\\scanned\\Big_A.png",
-    "character": "A",
-    "confidence": 0.9999943971633911
+    "file": "data\\icr_training\\scanned\\letters\\Bscanned.png",
+    "character": "E",
+    "confidence": 0.4472765326499939
   },
   {
-    "file": "data\\icr_training\\scanned\\C.png",
+    "file": "data\\icr_training\\scanned\\letters\\C.png",
     "character": "C",
     "confidence": 0.9999947547912598
   },
   {
-    "file": "data\\icr_training\\scanned\\D.png",
+    "file": "data\\icr_training\\scanned\\letters\\D.png",
     "character": "D",
     "confidence": 0.9996141195297241
   },
   {
-    "file": "data\\icr_training\\scanned\\E.png",
+    "file": "data\\icr_training\\scanned\\letters\\E.png",
     "character": "E",
     "confidence": 0.9965176582336426
   },
   {
-    "file": "data\\icr_training\\scanned\\F.png",
-    "character": "F",
-    "confidence": 0.9837988615036011
+    "file": "data\\icr_training\\scanned\\words\\hello.png",
+    "character": "Q",
+    "confidence": 0.7964024543762207
+  },
+  {
+    "file": "data\\icr_training\\scanned\\words\\hello_top.png",
+    "character": "T",
+    "confidence": 0.4501194655895233
+  },
+  {
+    "file": "data\\icr_training\\scanned\\words\\shrey.png",
+    "character": "W",
+    "confidence": 0.8382169604301453
+  },
+  {
+    "file": "data\\icr_training\\scanned\\words\\WhatsApp Image 2025-12-15 at 21.41.07_ba6bd03d.jpg",
+    "character": "B",
+    "confidence": 0.9688718914985657
   }
 ]

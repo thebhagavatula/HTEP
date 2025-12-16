@@ -39,16 +39,16 @@ venv.bak/
 # Jupyter Notebooks
 .ipynb_checkpoints
 
-# Data Files (IMPORTANT for medical data)
-# data/raw/
-# data/processed/
-# *.pdf
-# *.jpg
-# *.jpeg
-# *.png
-# *.tiff
-# *.dcm
-# *.dicom
+#Data Files (IMPORTANT for medical data)
+data/raw/
+data/processed/
+*.pdf
+*.jpg
+*.jpeg
+*.png
+*.tiff
+*.dcm
+*.dicom
 
 data/datasets/
 

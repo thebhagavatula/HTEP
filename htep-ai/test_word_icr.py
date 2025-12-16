@@ -34,7 +34,7 @@ def segment_characters(word_img):
     )
 
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
-    thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN,    kernel, iterations=1)
+    thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=1)
 
     contours, _ = cv2.findContours(
         thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
@@ -43,7 +43,7 @@ def segment_characters(word_img):
     boxes = []
     for c in contours:
         x, y, w, h = cv2.boundingRect(c)
-        if w * h > 400:
+        if w * h > 200:
             boxes.append((x, y, w, h))
 
     boxes.sort(key=lambda b: b[0])

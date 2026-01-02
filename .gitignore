@@ -1,0 +1,59 @@
+# ---------------------------
+# Python cache / build files
+# ---------------------------
+__pycache__/
+*.py[cod]
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# ---------------------------
+# Virtual environments
+# ---------------------------
+env/
+venv/
+.venv/
+ENV/
+
+# ---------------------------
+# IDE / Editor files
+# ---------------------------
+.vscode/
+.idea/
+*.iml
+
+# ---------------------------
+# OS files
+# ---------------------------
+.DS_Store
+Thumbs.db
+
+# ---------------------------
+# DATA (IMPORTANT)
+# Ignore all data but keep structure
+# ---------------------------
+htep-ai/data/**
+
+# Keep empty folders (optional but recommended)
+!htep-ai/data/raw/.gitkeep
+!htep-ai/data/processed/.gitkeep
+!htep-ai/data/icr_training/.gitkeep
+
+# ---------------------------
+# Images & documents (global)
+# ---------------------------
+*.png
+*.jpg
+*.jpeg
+*.bmp
+*.tiff
+*.pdf
+
+# ---------------------------
+# Logs & temp files
+# ---------------------------
+*.log
+*.tmp

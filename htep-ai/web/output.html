@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTEP - Result</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <nav>
+        <a href="index.html" class="logo">HTEP</a>
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="about.html">About</a></li>
+        </ul>
+    </nav>
+
+    <div class="container">
+        <h1>Extraction Results</h1>
+        <p class="subtitle" id="fileNameSub">Processing Complete</p>
+        
+        <div class="content-box">
+            <div id="displayText" class="text-content">
+                Loading text...
+            </div>
+
+            <div style="text-align: center; margin-top: 20px;">
+                <button class="btn" onclick="copyText()">Copy Text</button>
+                <a href="index.html" class="btn btn-secondary">Upload New</a>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2025 HTEP Platform</p>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const text = localStorage.getItem('extractedText');
+            const fileName = localStorage.getItem('fileName');
+
+            const textContainer = document.getElementById('displayText');
+            const fileSub = document.getElementById('fileNameSub');
+
+            if (text) {
+                textContainer.innerText = text;
+                fileSub.innerText = "Source: " + (fileName || "Unknown File");
+            } else {
+                textContainer.innerText = "No text found.";
+            }
+        });
+
+        function copyText() {
+            const text = document.getElementById('displayText').innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                alert("Copied!");
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,113 +1,92 @@
 import cv2
 import json
 import numpy as np
-from pathlib import Path
 import tensorflow as tf
-from tensorflow.keras import layers, models
+from pathlib import Path
 from tqdm import tqdm
+from tensorflow.keras.models import load_model
 
 # ---------------- CONFIG ----------------
+MODEL_PATH = "models/icr_cursive/icr_cursive_infer.h5"
+CHAR_MAP_PATH = "models/icr_cursive/char_map.json"
 TEST_DIR = Path("data/icr_training/cursive/test")
+
 IMG_HEIGHT = 32
 MAX_WIDTH = 128
-CHARS = "abcdefghijklmnopqrstuvwxyz"
 
-MODEL_PATH = "models/icr_cursive/icr_cursive_model.h5"
-CHAR_MAP_PATH = "models/icr_cursive/char_map.json"
-
-# ---------------- LOAD CHAR MAP ----------------
-with open(CHAR_MAP_PATH, "r") as f:
+# ---------------- LOAD MAP ----------------
+with open(CHAR_MAP_PATH) as f:
     char_to_idx = json.load(f)
 
-idx_to_char = {int(v): k for k, v in char_to_idx.items()}
-NUM_CLASSES = len(CHARS) + 1  # +1 for CTC blank
+idx_to_char = {v: k for k, v in char_to_idx.items()}
+BLANK_IDX = len(char_to_idx)
 
-# ---------------- IMAGE PREPROCESS ----------------
+# ---------------- PREPROCESS ----------------
 def preprocess(img_path):
     img = cv2.imread(str(img_path), cv2.IMREAD_GRAYSCALE)
-
     if img is None:
-        return None  # unreadable image
+        return None
 
     h, w = img.shape
-
     scale = IMG_HEIGHT / h
-    new_w = int(w * scale)
+    new_w = min(int(w * scale), MAX_WIDTH)
+
     img = cv2.resize(img, (new_w, IMG_HEIGHT))
 
     canvas = np.ones((IMG_HEIGHT, MAX_WIDTH), dtype=np.uint8) * 255
-    canvas[:, :min(new_w, MAX_WIDTH)] = img[:, :min(new_w, MAX_WIDTH)]
+    canvas[:, :new_w] = img
 
     img = canvas.astype("float32") / 255.0
-    return img[np.newaxis, ..., np.newaxis]
+    return img[..., np.newaxis]
 
-# ---------------- BUILD PREDICTION MODEL ----------------
-inputs = layers.Input(shape=(IMG_HEIGHT, MAX_WIDTH, 1))
+# ---------------- LOAD MODEL ----------------
+print("🔄 Loading inference model...")
+model = load_model(MODEL_PATH, compile=False)
 
-x = layers.Conv2D(64, 3, padding="same", activation="relu")(inputs)
-x = layers.MaxPooling2D(2, 2)(x)
-
-x = layers.Conv2D(128, 3, padding="same", activation="relu")(x)
-x = layers.MaxPooling2D(2, 2)(x)
-
-x = layers.Reshape((MAX_WIDTH // 4, -1))(x)
-
-x = layers.Bidirectional(layers.LSTM(128, return_sequences=True))(x)
-x = layers.Bidirectional(layers.LSTM(128, return_sequences=True))(x)
-
-outputs = layers.Dense(NUM_CLASSES, activation="softmax")(x)
-
-model = models.Model(inputs, outputs)
-model.load_weights(MODEL_PATH)
-
-# ---------------- CTC GREEDY DECODER ----------------
-def decode_beam(pred, beam_width=10):
-    pred = tf.convert_to_tensor(pred)
-    input_len = tf.ones(pred.shape[0]) * pred.shape[1]
-
-    decoded, _ = tf.keras.backend.ctc_decode(
-        pred,
-        input_length=input_len,
-        greedy=False,
-        beam_width=beam_width
-    )
-
-    result = decoded[0][0].numpy()
-    return "".join(idx_to_char[c] for c in result if c != -1)
-
-
-# ---------------- EVALUATION ----------------
+# ---------------- EVALUATE ----------------
 total = 0
 correct = 0
 errors = []
 
-label_dirs = [d for d in TEST_DIR.iterdir() if d.is_dir()]
+print("🧪 Evaluating...")
 
-for label_dir in tqdm(label_dirs, desc="Evaluating"):
-    gt_label = label_dir.name
+for word_dir in tqdm(sorted(TEST_DIR.iterdir())):
+    if not word_dir.is_dir():
+        continue
 
-    for img_path in label_dir.glob("*.png"):
+    gt = word_dir.name
+
+    for img_path in word_dir.glob("*.png"):
         img = preprocess(img_path)
-
         if img is None:
-            continue  # skip unreadable image
+            continue
 
-        pred = model.predict(img, verbose=0)
-        pred_text = decode_beam(pred)
+        img = img[np.newaxis, ...]
+        preds = model.predict(img, verbose=0)
+
+        decoded, _ = tf.keras.backend.ctc_decode(
+            preds,
+            input_length=[preds.shape[1]],
+            greedy=True
+        )
+
+        pred_idxs = decoded[0][0].numpy()
+        pred = "".join(idx_to_char[i] for i in pred_idxs if i != -1)
 
         total += 1
-        if pred_text == gt_label:
+        if pred == gt:
             correct += 1
-        else:
-            errors.append((gt_label, pred_text))
+        elif len(errors) < 10:
+            errors.append((gt, pred))
 
-accuracy = (correct / total) * 100 if total > 0 else 0.0
-
+# ---------------- RESULTS ----------------
+acc = 100 * correct / total
 print("\n✅ Evaluation complete")
 print(f"📊 Total samples     : {total}")
 print(f"🎯 Correct predictions: {correct}")
-print(f"🏆 Word Accuracy     : {accuracy:.2f}%")
+print(f"🏆 Word Accuracy     : {acc:.2f}%")
 
-print("\n🔎 Sample errors (first 10):")
-for gt, pred in errors[:10]:
-    print(f"GT: {gt} | Pred: {pred}")
+if errors:
+    print("\n🔎 Sample errors:")
+    for g, p in errors:
+        print(f"GT: {g} | Pred: {p}")

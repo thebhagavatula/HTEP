@@ -31,6 +31,7 @@ pytesseract.pytesseract.tesseract_cmd = (
 
 from src.ocr.extractor import OCRExtractor
 from src.recognition.icr_block_engine import BlockICREngine
+from src.recognition.icr_cursive_engine import CursiveICREngine
 
 # -------------------------------
 # FLASK APP
@@ -48,6 +49,7 @@ app = Flask(
 
 ocr_engine = OCRExtractor()
 block_icr = BlockICREngine()
+cursive_icr = CursiveICREngine()   # ✅ NEW
 
 print("✅ Backend ready")
 
@@ -93,19 +95,42 @@ def upload_file():
         else:
             ocr_text = ocr_engine.extract_from_image(str(file_path))
 
-        # ---------------- BLOCK ICR (IMAGES ONLY) ----------------
-        icr_text = ""
+        # ---------------- BLOCK + CURSIVE ICR (IMAGES ONLY) ----------------
+        block_text = ""
+        cursive_text = ""
+        cursive_conf = 0.0
 
         if suffix in [".png", ".jpg", ".jpeg"]:
             image = cv2.imread(str(file_path))
             if image is not None:
-                icr_text = block_icr.predict_sentence(image)
 
-        # ---------------- MERGE ----------------
+                # -------- BLOCK ICR --------
+                block_text = block_icr.predict_paragraph(image)
+
+                # Fallback to sentence if single-line
+                if "\n" not in block_text:
+                    block_text = block_icr.predict_sentence(image)
+
+                # -------- CURSIVE ICR (EXPERIMENTAL) --------
+                try:
+                    cursive_result = cursive_icr.predict_paragraph(image)
+                    cursive_text = cursive_result.get("text", "")
+                    cursive_conf = cursive_result.get("confidence", 0.0)
+                except Exception as e:
+                    print("⚠️ Cursive ICR failed:", e)
+
+        # ---------------- MERGE OUTPUT ----------------
         final_text = ocr_text.strip()
 
-        if icr_text.strip():
-            final_text += "\n\n[Handwritten]\n" + icr_text.strip()
+        if block_text.strip():
+            final_text += "\n\n[Block Handwritten]\n" + block_text.strip()
+
+        # ⚠️ Cursive is shown but NOT trusted
+        if cursive_text.strip():
+            final_text += (
+                "\n\n[Cursive Handwritten – Experimental]\n"
+                + cursive_text.strip()
+            )
 
         return jsonify({
             "text": final_text,
@@ -113,7 +138,7 @@ def upload_file():
         })
 
     except Exception as e:
-        print("❌ ERROR DURING PROCESSING")
+        print("ERROR DURING PROCESSING")
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 

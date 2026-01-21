@@ -9,6 +9,10 @@ from tensorflow import keras
 from src.segmentation.word_segmenter import segment_words
 from src.segmentation.char_segmenter import segment_characters
 
+from src.segmentation.line_segmenter import segment_lines
+from src.segmentation.char_segmenter import segment_characters_with_spaces
+
+from src.icr.preprocessing import preprocess_single_char
 
 class BlockICREngine:
     """
@@ -124,3 +128,31 @@ class BlockICREngine:
             sentence.append(result["text"])
 
         return " ".join(sentence)
+    
+    def predict_paragraph(self, image):
+        """
+        Predict multi-line handwritten paragraph (BLOCK ICR).
+        """
+
+        lines = segment_lines(image)
+        paragraph_text = []
+
+        for line_img in lines:
+            char_data = segment_characters_with_spaces(line_img)
+
+            line_text = []
+
+            for char_img, is_space in char_data:
+                if is_space:
+                    line_text.append(" ")
+                else:
+                    processed = preprocess_single_char(char_img)
+                    pred = self.predict_char(processed)
+
+                    line_text.append(pred["character"])
+
+            paragraph_text.append("".join(line_text))
+
+        return "\n".join(paragraph_text)
+
+

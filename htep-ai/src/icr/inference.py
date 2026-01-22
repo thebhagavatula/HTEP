@@ -229,7 +229,7 @@ def test_model(model_path: str = "models/icr_model",
             continue
 
         char = char_dir.name
-        images = list(char_dir.glob('*.png'))
+        images = list(char_dir.glob('*.png')) + list(char_dir.glob('*.jpg'))
 
         if not images:
             continue

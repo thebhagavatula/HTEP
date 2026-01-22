@@ -1,0 +1,62 @@
+[
+  {
+    "file": "data\\icr_training\\scanned\\letters\\0.png",
+    "character": "R",
+    "confidence": 0.7260021567344666
+  },
+  {
+    "file": "data\\icr_training\\scanned\\letters\\1.png",
+    "character": "R",
+    "confidence": 0.6433553695678711
+  },
+  {
+    "file": "data\\icr_training\\scanned\\letters\\2.png",
+    "character": "R",
+    "confidence": 0.8295578956604004
+  },
+  {
+    "file": "data\\icr_training\\scanned\\letters\\3.png",
+    "character": "R",
+    "confidence": 0.7891833186149597
+  },
+  {
+    "file": "data\\icr_training\\scanned\\letters\\4.png",
+    "character": "B",
+    "confidence": 0.6834533214569092
+  },
+  {
+    "file": "data\\icr_training\\scanned\\letters\\5.png",
+    "character": "A",
+    "confidence": 0.5082967877388
+  },
+  {
+    "file": "data\\icr_training\\scanned\\letters\\6.png",
+    "character": "B",
+    "confidence": 0.4739586412906647
+  },
+  {
+    "file": "data\\icr_training\\scanned\\letters\\7.png",
+    "character": "A",
+    "confidence": 0.9582607746124268
+  },
+  {
+    "file": "data\\icr_training\\scanned\\letters\\8.png",
+    "character": "N",
+    "confidence": 0.6037676930427551
+  },
+  {
+    "file": "data\\icr_training\\scanned\\letters\\9.png",
+    "character": "R",
+    "confidence": 0.3214859366416931
+  },
+  {
+    "file": "data\\icr_training\\scanned\\words\\JUMPS.jpg",
+    "character": "G",
+    "confidence": 0.3811139762401581
+  },
+  {
+    "file": "data\\icr_training\\scanned\\words\\LAZY.jpg",
+    "character": "G",
+    "confidence": 0.7411680817604065
+  }
+]

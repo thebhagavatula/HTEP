@@ -484,3 +484,9 @@ footer {
     width: 22px;  
     height: 22px;
 }
+.file-name-display {
+    margin-top: 15px;
+    font-size: 0.9rem;
+    font-weight: bold;
+    color: var(--text-color);
+}

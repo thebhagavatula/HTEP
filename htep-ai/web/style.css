@@ -29,7 +29,7 @@
 [data-theme="dark"] {
     --bg-color: #1a1a1a;
     --text-color: #e0e0e0;
-    --nav-bg: #2d2d2d;
+    --nav-bg: #1a1a1a;
     --logo-color: #4a9eff;
     --nav-link-color: #4a9eff;
     --nav-underline: #4a9eff;
@@ -140,6 +140,7 @@ nav ul a:hover::after {
     align-items: center;
     justify-content: center;
 }
+
 
 .theme-toggle:hover {
     background-color: rgba(0, 0, 0, 0.1);
@@ -477,4 +478,9 @@ footer {
     font-size: 0.9rem;
     margin-top: auto;
     transition: color 0.3s ease;
+}
+
+#theme-icon {
+    width: 22px;  
+    height: 22px;
 }

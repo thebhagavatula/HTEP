@@ -1,39 +1,46 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // --- Theme Toggle Functionality ---
+
+    /* ===============================
+       THEME TOGGLE (SUN / MOON SVG)
+    =============================== */
+
     const themeToggle = document.getElementById('theme-toggle');
-    const themeIcon = themeToggle ? themeToggle.querySelector('i') : null;
+    const themeIcon = document.getElementById('theme-icon');
 
-    // Check for saved theme preference or default to light mode
-    const currentTheme = localStorage.getItem('theme') || 'light';
-    document.documentElement.setAttribute('data-theme', currentTheme);
+    // Load saved theme or default to light
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
 
-    // Update icon based on current theme
     if (themeIcon) {
-        themeIcon.className = currentTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+        themeIcon.src = savedTheme === "dark"
+            ? "assets/sun.svg"
+            : "assets/moon.svg";
     }
 
-    // Toggle theme on button click
     if (themeToggle) {
         themeToggle.addEventListener('click', () => {
             const currentTheme = document.documentElement.getAttribute('data-theme');
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            const newTheme = currentTheme === "dark" ? "light" : "dark";
 
             document.documentElement.setAttribute('data-theme', newTheme);
             localStorage.setItem('theme', newTheme);
 
-            // Update icon
             if (themeIcon) {
-                themeIcon.className = newTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+                themeIcon.src = newTheme === "dark"
+                    ? "assets/sun.svg"
+                    : "assets/moon.svg";
             }
         });
     }
 
-    // --- Logic for Index Page (Upload) ---
+    /* ===============================
+       INDEX PAGE LOGIC (UPLOAD)
+    =============================== */
+
     const pdfInput = document.getElementById('pdfInput');
     const extractBtn = document.getElementById('extractBtn');
-    const uploadTriggerBtn = document.getElementById('uploadTriggerBtn'); // New ID for the trigger button
+    const uploadTriggerBtn = document.getElementById('uploadTriggerBtn');
 
-    // 1. Handle File Selection
     if (pdfInput) {
         pdfInput.addEventListener('change', () => {
             const fileNameDisplay = document.getElementById('fileNameDisplay');
@@ -44,23 +51,21 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 2. Trigger File Input from Custom Button
     if (uploadTriggerBtn && pdfInput) {
         uploadTriggerBtn.addEventListener('click', () => {
             pdfInput.click();
         });
     }
 
-    // 3. Handle PDF Upload & Extraction
     if (extractBtn) {
         extractBtn.addEventListener('click', async () => {
+
             const file = pdfInput.files[0];
             const loader = document.getElementById('loader');
             const status = document.getElementById('statusMessage');
 
             if (!file) return;
 
-            // UI Updates
             extractBtn.disabled = true;
             extractBtn.innerText = "Processing...";
             if (loader) loader.style.display = "block";
@@ -70,7 +75,6 @@ document.addEventListener('DOMContentLoaded', () => {
             formData.append('file', file);
 
             try {
-                // Ensure backend is running on port 5000
                 const response = await fetch('http://127.0.0.1:5000/upload', {
                     method: 'POST',
                     body: formData
@@ -80,9 +84,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const data = await response.json();
 
-                // Save result and redirect
                 localStorage.setItem('extractedText', data.text);
                 localStorage.setItem('fileName', file.name);
+
                 window.location.href = 'output.html';
 
             } catch (error) {
@@ -95,11 +99,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- Logic for Output Page (Result) ---
+    /* ===============================
+       OUTPUT PAGE LOGIC
+    =============================== */
+
     const displayText = document.getElementById('displayText');
-    
+
     if (displayText) {
-        // Load data on page load
+
         const text = localStorage.getItem('extractedText');
         const fileName = localStorage.getItem('fileName');
         const fileSub = document.getElementById('fileNameSub');
@@ -111,7 +118,6 @@ document.addEventListener('DOMContentLoaded', () => {
             displayText.innerText = "No text found.";
         }
 
-        // Handle Copy Button
         const copyBtn = document.getElementById('copyBtn');
         if (copyBtn) {
             copyBtn.addEventListener('click', () => {
@@ -121,4 +127,5 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
     }
+
 });

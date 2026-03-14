@@ -38,7 +38,7 @@ def predict_sentence(image_path):
 
 
 if __name__ == "__main__":
-    IMAGE_PATH = "tests/shrey614.jpg"  # 👈 put your sentence image here
+    IMAGE_PATH = "data/icr_training/scanned/sentences/hellomynameisNilesh.png"  # 👈 put your sentence image here
 
     result = predict_sentence(IMAGE_PATH)
 

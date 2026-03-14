@@ -9,25 +9,38 @@ def segment_characters(word_img, min_area=200):
     Segment characters from a word image.
     SAME logic as your old test_word_icr.py
     """
+    
+    try:
+        # Handle both color and grayscale images
+        if word_img is None:
+            print("Warning: Empty image provided to segmentation")
+            return []
+            
+        if len(word_img.shape) == 3:
+            gray = cv2.cvtColor(word_img, cv2.COLOR_BGR2GRAY)
+        else:
+            gray = word_img.copy()
 
-    gray = cv2.cvtColor(word_img, cv2.COLOR_BGR2GRAY)
+        # Binary (invert for white text on black bg)
+        _, thresh = cv2.threshold(
+            gray, 0, 255,
+            cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
+        )
 
-    # Binary (invert for white text on black bg)
-    _, thresh = cv2.threshold(
-        gray, 0, 255,
-        cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
-    )
+        # Merge strokes slightly
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
+        thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=1)
 
-    # Merge strokes slightly
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
-    thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=1)
-
-    # Find contours
-    contours, _ = cv2.findContours(
-        thresh,
-        cv2.RETR_EXTERNAL,
-        cv2.CHAIN_APPROX_SIMPLE
-    )
+        # Find contours
+        contours, _ = cv2.findContours(
+            thresh,
+            cv2.RETR_EXTERNAL,
+            cv2.CHAIN_APPROX_SIMPLE
+        )
+        
+    except Exception as e:
+        print(f"Error in character segmentation: {e}")
+        return []
 
     boxes = []
     for c in contours:

@@ -24,7 +24,7 @@ class ICRTrainer:
 
     def __init__(
         self,
-        dataset_dir="data/icr_training/block",
+        dataset_dir="data/datasets/dataset_block",
         model_dir="models/icr_block"
     ):
         self.dataset_dir = Path(dataset_dir)
@@ -68,8 +68,14 @@ class ICRTrainer:
     def load_dataset(self):
         print("📂 Loading block ICR dataset...")
 
-        X_train, y_train = self._load_data_from_dir(self.dataset_dir / "train")
-        X_test, y_test = self._load_data_from_dir(self.dataset_dir / "test")
+        # Load all data from the dataset_block directory
+        X_all, y_all = self._load_data_from_dir(self.dataset_dir)
+
+        # Create train/test split (80/20)
+        from sklearn.model_selection import train_test_split
+        X_train, X_test, y_train, y_test = train_test_split(
+            X_all, y_all, test_size=0.2, random_state=42, stratify=y_all
+        )
 
         y_train_enc = self.label_encoder.fit_transform(y_train)
         y_test_enc = self.label_encoder.transform(y_test)
@@ -152,9 +158,9 @@ class ICRTrainer:
     # --------------------------------------------------
 
     def save_model(self):
-        model_path = self.model_dir / "block_icr_cnn.h5"
+        model_path = self.model_dir / "icr_model.h5"
         labels_path = self.model_dir / "labels.pkl"
-        metadata_path = self.model_dir / "metadata.json"
+        metadata_path = self.model_dir / "icr_model_metadata.json"
 
         self.model.save(model_path)
 

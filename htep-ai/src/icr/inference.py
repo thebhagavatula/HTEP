@@ -75,3 +75,24 @@ class ICRInference:
             raise FileNotFoundError(f"Cannot read image: {image_path}")
 
         return self.predict_char(img, style=style)
+
+
+# --------------------------------------------------
+# ICRPredictor - ALIAS FOR TEST COMPATIBILITY
+# --------------------------------------------------
+
+class ICRPredictor(ICRInference):
+    """
+    Alias for ICRInference for backward compatibility with test files.
+    """
+    
+    def __init__(self, model_path=None):
+        super().__init__()
+        # model_path is ignored since we use the default model location
+    
+    def predict_array(self, processed_image):
+        """
+        Compatibility method for test files.
+        Expects a preprocessed image array.
+        """
+        return self.predict_char(processed_image)

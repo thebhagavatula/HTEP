@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HTEP - About</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
 
@@ -13,37 +14,77 @@
         <ul>
             <li><a href="index.html">Home</a></li>
             <li><a href="about.html">About</a></li>
+            <li><button id="theme-toggle" class="theme-toggle">
+                    <img id="theme-icon" src="assets/sun.svg">
+                </button></li>
         </ul>
     </nav>
 
-    <div class="container">
-        <h1>About HTEP</h1>
-        <p class="subtitle">Healthcare Text Extraction Platform</p>
-        
-        <div class="content-box">
-            <h3 style="color: #1f3a52; margin-bottom: 15px;">Our Mission</h3>
-            <p style="margin-bottom: 20px; line-height: 1.8;">
-                The Healthcare Text Extraction Platform (HTEP) simplifies the process of digitizing medical records.
-                By leveraging advanced Optical Character Recognition (OCR) and AI, we transform locked PDF documents 
-                and images into editable, searchable text.
-            </p>
-
-            <h3 style="color: #1f3a52; margin-bottom: 15px;">How It Works</h3>
-            <ul style="margin-left: 20px; margin-bottom: 30px; line-height: 1.8;">
-                <li>Upload your medical report (PDF, PNG, or JPEG).</li>
-                <li>Our secure AI engine processes the image structure.</li>
-                <li>Receive clean, extracted text instantly.</li>
-            </ul>
-
-            <div style="text-align: center;">
-                <a href="index.html" class="btn">Try it Now</a>
-            </div>
+    <!-- Hero Section -->
+    <header class="hero">
+        <div class="container">
+            <h1>About HTEP</h1>
+            <p class="hero-subtitle">Healthcare Text Extraction Platform</p>
         </div>
-    </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+
+            <!-- Our Mission Section -->
+            <section class="mission-section">
+                <div class="mission-card">
+                    <h2>Our Mission</h2>
+                    <p>
+                        The Healthcare Text Extraction Platform (HTEP) simplifies the process of digitizing medical records.
+                        By leveraging advanced Optical Character Recognition (OCR) and AI, we transform locked PDF documents
+                        and images into editable, searchable text.
+                    </p>
+                </div>
+            </section>
+
+            <!-- How It Works Section -->
+            <section class="how-it-works-section">
+                <h2>How It Works</h2>
+                <div class="steps-grid">
+                    <div class="step">
+                        <div class="step-icon">
+                            <i class="fas fa-upload"></i>
+                        </div>
+                        <h3>Step 1</h3>
+                        <p>Upload your medical report (PDF, PNG, or JPEG).</p>
+                    </div>
+                    <div class="step">
+                        <div class="step-icon">
+                            <i class="fas fa-cogs"></i>
+                        </div>
+                        <h3>Step 2</h3>
+                        <p>Our secure AI engine processes the image structure.</p>
+                    </div>
+                    <div class="step">
+                        <div class="step-icon">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <h3>Step 3</h3>
+                        <p>Receive clean, extracted text instantly.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Call to Action -->
+            <section class="cta-section">
+                <a href="index.html" class="btn btn-primary">Try it Now</a>
+            </section>
+
+        </div>
+    </main>
 
     <footer>
-        <p>&copy; 2025 HTEP Platform</p>
+        <p>&copy; 2026 HTEP Platform</p>
     </footer>
 
+    <!-- Link to external JS -->
+    <script src="app.js"></script>
 </body>
 </html>

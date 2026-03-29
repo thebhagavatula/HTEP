@@ -7,12 +7,15 @@ import cv2
 import sys
 import numpy as np
 from pathlib import Path
+from typing import List
 
 # Ensure project root is on path
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from src.icr.inference import ICRPredictor
+from src.recognition.icr_block_engine import BlockICREngine
 from src.nlp.block_parser import BlockTextParser
+from src.nlp.lexicon_beam_decoder import LexiconBeamDecoder
 
 # --------------------------------------------------
 # CONFIG
@@ -31,7 +34,22 @@ PARSER_TERMS = [
 # --------------------------------------------------
 
 predictor = ICRPredictor(model_path=MODEL_PATH)
-parser = BlockTextParser(dictionary_terms=PARSER_TERMS)
+parser = BlockTextParser(
+    dictionary_terms=PARSER_TERMS,
+    english_terms=PARSER_TERMS,
+    similarity_cutoff=0.75,
+    english_similarity_cutoff=0.8,
+)
+engine = BlockICREngine()
+
+lexicon_terms = list(PARSER_TERMS)
+decoder = LexiconBeamDecoder(
+    lexicon_terms,
+    primary_terms=PARSER_TERMS,
+    max_edit_distance=2,
+    replacement_confidence_threshold=0.95,
+    replacement_min_char_confidence_threshold=0.90,
+)
 
 # --------------------------------------------------
 # CHARACTER SEGMENTATION (WORD LEVEL)
@@ -150,19 +168,24 @@ def predict_word(image_path: Path):
         return None
 
     char_images = segment_characters(img)
-    predicted_chars = []
+    candidate_lists: List[List[dict]] = []
 
     debug_dir = Path("data/processed/word_chars") / image_path.stem
     debug_dir.mkdir(parents=True, exist_ok=True)
 
     for i, char_img in enumerate(char_images):
         processed = preprocess_char_from_word(char_img, TARGET_SIZE)
-        pred = predictor.predict_array(processed)
-
-        predicted_chars.append(pred["character"])
+        candidates = engine.predict_char_candidates(processed, top_k=4)
+        if candidates:
+            candidate_lists.append(candidates)
         cv2.imwrite(str(debug_dir / f"char_{i}.png"), processed)
 
-    return "".join(predicted_chars)
+    if not candidate_lists:
+        return ""
+
+    decoded = decoder.decode_word(candidate_lists, beam_width=25)
+
+    return decoded["decoded_word"]
 
 # --------------------------------------------------
 # RUN ON ALL WORD IMAGES

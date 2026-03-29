@@ -115,6 +115,26 @@ class BlockICREngine:
     # SINGLE CHARACTER
     # --------------------------------------------------
 
+    @staticmethod
+    def _normalize_label(raw_label):
+        """Map training labels to clean output characters."""
+        label = str(raw_label)
+
+        if label.endswith("_block"):
+            base = label[:-6]
+            return base[0] if base else "?"
+
+        if label.endswith("_cursive"):
+            base = label[:-8]
+            return base[0] if base else "?"
+
+        # Keep canonical single-character classes unchanged.
+        if len(label) == 1:
+            return label
+
+        # Fallback for unexpected labels.
+        return label
+
     def predict_char(self, img):
         x = self._preprocess(img)
 
@@ -135,7 +155,8 @@ class BlockICREngine:
                     print(f"Warning: Predicted index {idx} exceeds available classes ({len(self.label_encoder.classes_)}), using fallback")
                     char = "?"
                 else:
-                    char = self.label_encoder.inverse_transform([idx])[0]
+                    raw_char = self.label_encoder.inverse_transform([idx])[0]
+                    char = self._normalize_label(raw_char)
             # For mock predictions, char is already set above
                     
         except (ValueError, IndexError) as e:
@@ -146,6 +167,42 @@ class BlockICREngine:
             "character": char,
             "confidence": confidence
         }
+
+    def predict_char_candidates(self, img, top_k=5):
+        """
+        Return top-k normalized character candidates for a character image.
+        """
+        x = self._preprocess(img)
+
+        if self.model is None:
+            return [{"character": "A", "confidence": 0.5}]
+
+        probs = self.model.predict(x, verbose=0)[0]
+        top_k = max(1, min(int(top_k), len(probs)))
+
+        ranked_idx = np.argsort(probs)[::-1][:top_k]
+
+        # Merge probabilities when multiple raw labels map to the same character.
+        merged = {}
+        for idx in ranked_idx:
+            idx = int(idx)
+            confidence = float(probs[idx])
+
+            if idx >= len(self.label_encoder.classes_):
+                char = "?"
+            else:
+                raw_char = self.label_encoder.inverse_transform([idx])[0]
+                char = self._normalize_label(raw_char)
+
+            merged[char] = max(merged.get(char, 0.0), confidence)
+
+        candidates = [
+            {"character": char, "confidence": conf}
+            for char, conf in merged.items()
+        ]
+        candidates.sort(key=lambda item: item["confidence"], reverse=True)
+
+        return candidates
 
     # --------------------------------------------------
     # WORD (uses char segmenter)

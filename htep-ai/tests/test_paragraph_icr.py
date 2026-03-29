@@ -7,12 +7,15 @@ import cv2
 import sys
 import numpy as np
 from pathlib import Path
+from typing import List
 
 # Ensure project root is on path
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from src.icr.inference import ICRPredictor
+from src.recognition.icr_block_engine import BlockICREngine
 from src.nlp.block_parser import BlockTextParser
+from src.nlp.lexicon_beam_decoder import LexiconBeamDecoder
 
 # --------------------------------------------------
 # CONFIG
@@ -23,10 +26,20 @@ PARAGRAPHS_DIR = Path("data/icr_training/scanned/paragraphs")
 TARGET_SIZE = (28, 28)
 SPACE_THRESHOLD = 1.5  # Gap multiplier to detect spaces between words
 LINE_HEIGHT_THRESHOLD = 0.5  # Multiplier for detecting new lines
-PARSER_TERMS = [
-    "hello", "my", "name", "is", "nilesh", "patient", "aspirin", "diabetes",
-    "metformin", "hypertension", "discharge", "prescription", "diagnosis",
-    "report", "hospital", "instructions",
+PARAGRAPH_LEXICON_TERMS = [
+    "patient",
+    "aspirin",
+    "diabetes",
+    "metformin",
+    "hypertension",
+    "discharge",
+    "prescription",
+    "diagnosis",
+    "report",
+    "hospital",
+    "instructions",
+    "treatment",
+    "medication",
 ]
 
 # --------------------------------------------------
@@ -34,7 +47,20 @@ PARSER_TERMS = [
 # --------------------------------------------------
 
 predictor = ICRPredictor(model_path=MODEL_PATH)
-parser = BlockTextParser(dictionary_terms=PARSER_TERMS)
+parser = BlockTextParser(
+    dictionary_terms=PARAGRAPH_LEXICON_TERMS,
+    enable_english_layer=False,
+)
+engine = BlockICREngine()
+
+lexicon_terms = list(PARAGRAPH_LEXICON_TERMS)
+decoder = LexiconBeamDecoder(
+    lexicon_terms,
+    primary_terms=PARAGRAPH_LEXICON_TERMS,
+    max_edit_distance=1,
+    replacement_confidence_threshold=0.76,
+    replacement_min_char_confidence_threshold=0.58,
+)
 
 # --------------------------------------------------
 # LINE SEGMENTATION
@@ -195,16 +221,25 @@ def predict_paragraph(image_path: Path, space_threshold=SPACE_THRESHOLD):
         
         line_text = []
         char_index = 0
+        current_word_candidates: List[List[dict]] = []
+
+        def flush_word_candidates():
+            if not current_word_candidates:
+                return
+            decoded = decoder.decode_word(current_word_candidates, beam_width=25)
+            line_text.append(decoded["decoded_word"])
+            current_word_candidates.clear()
         
         for char_img, is_space, x_pos in char_data:
             if is_space:
+                flush_word_candidates()
                 line_text.append(" ")
             else:
                 # Preprocess and predict
                 processed = preprocess_char(char_img, TARGET_SIZE)
-                pred = predictor.predict_array(processed)
-                
-                line_text.append(pred["character"])
+                candidates = engine.predict_char_candidates(processed, top_k=4)
+                if candidates:
+                    current_word_candidates.append(candidates)
                 
                 # Save debug image
                 cv2.imwrite(
@@ -212,6 +247,8 @@ def predict_paragraph(image_path: Path, space_threshold=SPACE_THRESHOLD):
                     processed
                 )
                 char_index += 1
+
+        flush_word_candidates()
         
         predicted_lines.append("".join(line_text))
     

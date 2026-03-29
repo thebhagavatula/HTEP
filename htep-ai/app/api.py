@@ -32,6 +32,7 @@ pytesseract.pytesseract.tesseract_cmd = (
 from src.ocr.extractor import OCRExtractor
 from src.recognition.icr_block_engine import BlockICREngine
 from src.recognition.icr_cursive_engine import CursiveICREngine
+from src.nlp.block_parser import BlockTextParser
 
 # -------------------------------
 # FLASK APP
@@ -50,6 +51,7 @@ app = Flask(
 ocr_engine = OCRExtractor()
 block_icr = BlockICREngine()
 cursive_icr = CursiveICREngine()   # ✅ NEW
+block_parser = BlockTextParser()
 
 print("✅ Backend ready")
 
@@ -97,6 +99,8 @@ def upload_file():
 
         # ---------------- BLOCK + CURSIVE ICR (IMAGES ONLY) ----------------
         block_text = ""
+        block_text_raw = ""
+        block_parse_result = None
         cursive_text = ""
         cursive_conf = 0.0
 
@@ -110,6 +114,16 @@ def upload_file():
                 # Fallback to sentence if single-line
                 if "\n" not in block_text:
                     block_text = block_icr.predict_sentence(image)
+
+                block_text_raw = block_text
+
+                # -------- BLOCK PARSER (SPACY + SCISPACY DICTIONARY) --------
+                if block_text.strip():
+                    try:
+                        block_parse_result = block_parser.parse(block_text)
+                        block_text = block_parse_result.get("corrected_text", block_text)
+                    except Exception as e:
+                        print("⚠️ Block parser failed:", e)
 
                 # -------- CURSIVE ICR (EXPERIMENTAL) --------
                 try:
@@ -132,10 +146,25 @@ def upload_file():
                 + cursive_text.strip()
             )
 
-        return jsonify({
+        response = {
             "text": final_text,
             "file": filename
-        })
+        }
+
+        if block_text_raw.strip() and block_parse_result is not None:
+            response["block_text_raw"] = block_text_raw
+            response["block_text_parsed"] = block_text
+            response["block_parser"] = {
+                "backend": block_parse_result.get("backend", "unknown"),
+                "dictionary_matches": block_parse_result.get("dictionary_matches", []),
+                "dictionary_layers": block_parse_result.get(
+                    "dictionary_layers", {"medical": [], "english": []}
+                ),
+                "entities": block_parse_result.get("entities", []),
+                "corrections": block_parse_result.get("corrections", []),
+            }
+
+        return jsonify(response)
 
     except Exception as e:
         print("ERROR DURING PROCESSING")

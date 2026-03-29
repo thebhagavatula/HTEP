@@ -12,6 +12,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from src.icr.inference import ICRPredictor
+from src.nlp.block_parser import BlockTextParser
 
 # --------------------------------------------------
 # CONFIG
@@ -20,12 +21,17 @@ from src.icr.inference import ICRPredictor
 MODEL_PATH = "models/icr_model"
 WORDS_DIR = Path("data/icr_training/scanned/words")
 TARGET_SIZE = (28, 28)
+PARSER_TERMS = [
+    "hello", "my", "name", "is", "nilesh", "patient", "aspirin",
+    "diabetes", "metformin", "hypertension", "report", "diagnosis",
+]
 
 # --------------------------------------------------
 # LOAD MODEL
 # --------------------------------------------------
 
 predictor = ICRPredictor(model_path=MODEL_PATH)
+parser = BlockTextParser(dictionary_terms=PARSER_TERMS)
 
 # --------------------------------------------------
 # CHARACTER SEGMENTATION (WORD LEVEL)
@@ -176,4 +182,7 @@ if __name__ == "__main__":
         word = predict_word(img_path)
 
         if word is not None:
-            print(f"{img_path.name}  →  {word}")
+            parsed = parser.parse(word)
+            print(f"{img_path.name}  →  RAW: {word}")
+            print(f"{' ' * (len(img_path.name) + 5)}PARSED: {parsed['corrected_text']}")
+            print(f"{' ' * (len(img_path.name) + 5)}CORRECTIONS: {parsed['corrections']}")

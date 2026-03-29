@@ -12,6 +12,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from src.icr.inference import ICRPredictor
+from src.nlp.block_parser import BlockTextParser
 
 # --------------------------------------------------
 # CONFIG
@@ -22,12 +23,18 @@ PARAGRAPHS_DIR = Path("data/icr_training/scanned/paragraphs")
 TARGET_SIZE = (28, 28)
 SPACE_THRESHOLD = 1.5  # Gap multiplier to detect spaces between words
 LINE_HEIGHT_THRESHOLD = 0.5  # Multiplier for detecting new lines
+PARSER_TERMS = [
+    "hello", "my", "name", "is", "nilesh", "patient", "aspirin", "diabetes",
+    "metformin", "hypertension", "discharge", "prescription", "diagnosis",
+    "report", "hospital", "instructions",
+]
 
 # --------------------------------------------------
 # LOAD MODEL
 # --------------------------------------------------
 
 predictor = ICRPredictor(model_path=MODEL_PATH)
+parser = BlockTextParser(dictionary_terms=PARSER_TERMS)
 
 # --------------------------------------------------
 # LINE SEGMENTATION
@@ -247,6 +254,12 @@ if __name__ == "__main__":
         if result is not None:
             print("Predicted text:")
             print(result)
+            parsed = parser.parse(result)
+            print("\nParsed text:")
+            print(parsed["corrected_text"])
+            print("\nParser backend:", parsed["backend"])
+            print("Dictionary matches:", parsed["dictionary_matches"])
+            print("Corrections:", parsed["corrections"])
             print(f"\nTotal lines: {len(result.split(chr(10)))}")
             print(f"Total characters: {len(result)}")
     

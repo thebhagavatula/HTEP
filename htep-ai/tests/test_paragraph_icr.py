@@ -15,7 +15,8 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 from src.icr.inference import ICRPredictor
 from src.recognition.icr_block_engine import BlockICREngine
 from src.nlp.block_parser import BlockTextParser
-from src.nlp.lexicon_beam_decoder import LexiconBeamDecoder
+from src.nlp.lexicon_beam_decoder import LexiconBeamDecoder, load_english_words
+from src.icr.preprocessing import preprocess_single_char
 
 # --------------------------------------------------
 # CONFIG
@@ -26,6 +27,9 @@ PARAGRAPHS_DIR = Path("data/icr_training/scanned/paragraphs")
 TARGET_SIZE = (28, 28)
 SPACE_THRESHOLD = 1.5  # Gap multiplier to detect spaces between words
 LINE_HEIGHT_THRESHOLD = 0.5  # Multiplier for detecting new lines
+MIN_CHAR_AREA = 60
+TOP_K_CANDIDATES = 6
+BEAM_WIDTH = 50
 PARAGRAPH_LEXICON_TERMS = [
     "patient",
     "aspirin",
@@ -40,7 +44,35 @@ PARAGRAPH_LEXICON_TERMS = [
     "instructions",
     "treatment",
     "medication",
+    "viral",
+    "uti",
+    "tablet",
+    "capsule",
+    "daily",
+    "twice",
+    "mg",
+    "ml",
+    "blood",
+    "pressure",
+    "follow",
+    "review",
 ]
+
+PARAGRAPH_COMMON_TERMS = [
+    "the", "and", "for", "with", "is", "in", "to", "of", "on", "a", "an",
+    "take", "after", "before", "morning", "night", "days", "weeks", "pain",
+    "fever", "cough", "doctor", "advice", "report", "test", "result",
+]
+
+ENGLISH_WORDS_PATH = Path("data/dictionaries/english_words_alpha.txt")
+BROAD_ENGLISH_TERMS = load_english_words(
+    ENGLISH_WORDS_PATH,
+    max_words=50000,
+    min_len=3,
+    max_len=12,
+)
+
+ENGLISH_TERMS = sorted(set(PARAGRAPH_COMMON_TERMS + BROAD_ENGLISH_TERMS))
 
 # --------------------------------------------------
 # LOAD MODEL
@@ -49,17 +81,21 @@ PARAGRAPH_LEXICON_TERMS = [
 predictor = ICRPredictor(model_path=MODEL_PATH)
 parser = BlockTextParser(
     dictionary_terms=PARAGRAPH_LEXICON_TERMS,
-    enable_english_layer=False,
+    english_terms=ENGLISH_TERMS,
+    similarity_cutoff=0.76,
+    english_similarity_cutoff=0.86,
+    english_fuzzy_requires_ocr_noise=True,
 )
 engine = BlockICREngine()
 
-lexicon_terms = list(PARAGRAPH_LEXICON_TERMS)
+lexicon_terms = list(PARAGRAPH_LEXICON_TERMS) + list(ENGLISH_TERMS)
 decoder = LexiconBeamDecoder(
     lexicon_terms,
     primary_terms=PARAGRAPH_LEXICON_TERMS,
-    max_edit_distance=1,
-    replacement_confidence_threshold=0.76,
-    replacement_min_char_confidence_threshold=0.58,
+    max_edit_distance=2,
+    replacement_confidence_threshold=0.90,
+    replacement_min_char_confidence_threshold=0.74,
+    non_primary_replacement_min_char_confidence=0.42,
 )
 
 # --------------------------------------------------
@@ -111,7 +147,7 @@ def segment_lines(paragraph_img):
 # CHARACTER SEGMENTATION WITH SPACE DETECTION
 # --------------------------------------------------
 
-def segment_line(line_img, space_threshold=SPACE_THRESHOLD):
+def segment_line(line_img, space_threshold=SPACE_THRESHOLD, min_char_area=MIN_CHAR_AREA):
     """
     Segment characters from a single line and detect spaces.
     
@@ -136,9 +172,14 @@ def segment_line(line_img, space_threshold=SPACE_THRESHOLD):
 
     # Get bounding boxes
     boxes = []
+    areas = [cv2.contourArea(c) for c in contours]
+    area_threshold = min_char_area
+    if areas:
+        area_threshold = max(MIN_CHAR_AREA, int(np.percentile(np.array(areas), 20) * 0.6))
+
     for c in contours:
         x, y, w, h = cv2.boundingRect(c)
-        if w * h > 100:  # Filter noise
+        if w * h > area_threshold:  # Filter noise with adaptive threshold
             boxes.append((x, y, w, h))
 
     # Sort by x position
@@ -173,17 +214,49 @@ def segment_line(line_img, space_threshold=SPACE_THRESHOLD):
 
 def preprocess_char(char_img, target_size=(28, 28)):
     """Preprocess character to match training data format."""
-    gray = cv2.cvtColor(char_img, cv2.COLOR_BGR2GRAY)
+    return preprocess_single_char(char_img, target_size=target_size)
 
-    _, thresh = cv2.threshold(
-        gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
-    )
 
-    if np.sum(thresh == 0) < np.sum(thresh == 255):
-        thresh = 255 - thresh
+def decode_line_with_strategy(line_img, line_idx, debug_dir, space_threshold, min_char_area):
+    """Decode one line using a specific segmentation strategy and return text + confidence."""
+    char_data = segment_line(line_img, space_threshold=space_threshold, min_char_area=min_char_area)
+    if not char_data:
+        return "", 0.0
 
-    final = cv2.resize(thresh, target_size, interpolation=cv2.INTER_AREA)
-    return final
+    line_text = []
+    char_index = 0
+    current_word_candidates: List[List[dict]] = []
+    confidence_samples: List[float] = []
+
+    def flush_word_candidates():
+        if not current_word_candidates:
+            return
+        decoded = decoder.decode_word(current_word_candidates, beam_width=BEAM_WIDTH)
+        line_text.append(decoded["decoded_word"])
+        confidence_samples.append(float(decoded.get("top1_mean_confidence", 0.0)))
+        current_word_candidates.clear()
+
+    for char_img, is_space, _ in char_data:
+        if is_space:
+            flush_word_candidates()
+            line_text.append(" ")
+        else:
+            processed = preprocess_char(char_img, TARGET_SIZE)
+            candidates = engine.predict_char_candidates(processed, top_k=TOP_K_CANDIDATES)
+            if candidates:
+                current_word_candidates.append(candidates)
+
+            cv2.imwrite(
+                str(debug_dir / f"line{line_idx:02d}_char{char_index:03d}.png"),
+                processed,
+            )
+            char_index += 1
+
+    flush_word_candidates()
+
+    text = "".join(line_text)
+    avg_conf = (sum(confidence_samples) / len(confidence_samples)) if confidence_samples else 0.0
+    return text, avg_conf
 
 # --------------------------------------------------
 # PARAGRAPH PREDICTION
@@ -213,44 +286,29 @@ def predict_paragraph(image_path: Path, space_threshold=SPACE_THRESHOLD):
 
     # Process each line
     for line_idx, (line_img, y_pos) in enumerate(lines):
-        # Segment characters in line
-        char_data = segment_line(line_img, space_threshold)
-        
-        if not char_data:
-            continue
-        
-        line_text = []
-        char_index = 0
-        current_word_candidates: List[List[dict]] = []
+        strategies = [
+            (space_threshold, MIN_CHAR_AREA),
+            (max(1.2, space_threshold - 0.2), max(40, MIN_CHAR_AREA - 15)),
+            (space_threshold + 0.25, MIN_CHAR_AREA + 15),
+        ]
 
-        def flush_word_candidates():
-            if not current_word_candidates:
-                return
-            decoded = decoder.decode_word(current_word_candidates, beam_width=25)
-            line_text.append(decoded["decoded_word"])
-            current_word_candidates.clear()
-        
-        for char_img, is_space, x_pos in char_data:
-            if is_space:
-                flush_word_candidates()
-                line_text.append(" ")
-            else:
-                # Preprocess and predict
-                processed = preprocess_char(char_img, TARGET_SIZE)
-                candidates = engine.predict_char_candidates(processed, top_k=4)
-                if candidates:
-                    current_word_candidates.append(candidates)
-                
-                # Save debug image
-                cv2.imwrite(
-                    str(debug_dir / f"line{line_idx:02d}_char{char_index:03d}.png"), 
-                    processed
-                )
-                char_index += 1
+        best_text = ""
+        best_conf = -1.0
 
-        flush_word_candidates()
-        
-        predicted_lines.append("".join(line_text))
+        for strategy_space, strategy_area in strategies:
+            text, conf = decode_line_with_strategy(
+                line_img,
+                line_idx,
+                debug_dir,
+                space_threshold=strategy_space,
+                min_char_area=strategy_area,
+            )
+            if conf > best_conf:
+                best_text = text
+                best_conf = conf
+
+        if best_text:
+            predicted_lines.append(best_text)
     
     return "\n".join(predicted_lines)
 
@@ -274,6 +332,27 @@ if __name__ == "__main__":
         print(f"No images found in {PARAGRAPHS_DIR}")
         exit(1)
     
+    # Optional CLI selector:
+    # - latest : run only the most recently modified file
+    # - <filename> : run only that file in paragraph folder
+    # - <absolute/relative path> : run only that path if it exists
+    selected = None
+    if len(sys.argv) > 1:
+        arg = sys.argv[1].strip()
+        if arg.lower() == "latest":
+            selected = max(image_files, key=lambda p: p.stat().st_mtime)
+        else:
+            candidate = Path(arg)
+            if candidate.exists() and candidate.is_file():
+                selected = candidate
+            else:
+                named = PARAGRAPHS_DIR / arg
+                if named.exists() and named.is_file():
+                    selected = named
+
+    if selected is not None:
+        image_files = [selected]
+
     print(f"\n{'='*60}")
     print(f"PARAGRAPH ICR TEST")
     print(f"{'='*60}")

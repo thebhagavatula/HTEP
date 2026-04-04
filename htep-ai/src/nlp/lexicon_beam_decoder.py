@@ -20,11 +20,15 @@ class LexiconBeamDecoder:
         max_edit_distance: int = 2,
         replacement_confidence_threshold: float = 0.80,
         replacement_min_char_confidence_threshold: float = 0.60,
+        non_primary_replacement_min_char_confidence: float = 0.45,
     ):
         self.max_edit_distance = max_edit_distance
         self.replacement_confidence_threshold = replacement_confidence_threshold
         self.replacement_min_char_confidence_threshold = (
             replacement_min_char_confidence_threshold
+        )
+        self.non_primary_replacement_min_char_confidence = (
+            non_primary_replacement_min_char_confidence
         )
         self.lexicon = set()
         self.primary_lexicon = set()
@@ -211,10 +215,21 @@ class LexiconBeamDecoder:
                 distance = near_dist
 
                 # Confidence-gated replacement: only override when confidence is low.
-                if (
-                    top1_mean_confidence <= self.replacement_confidence_threshold
-                    or min_top1_confidence <= self.replacement_min_char_confidence_threshold
-                ):
+                is_primary_candidate = near_word in self.primary_lexicon
+
+                if is_primary_candidate:
+                    allow_replacement = (
+                        top1_mean_confidence <= self.replacement_confidence_threshold
+                        or min_top1_confidence <= self.replacement_min_char_confidence_threshold
+                    )
+                else:
+                    # Broad-lexicon fallback is intentionally conservative.
+                    allow_replacement = (
+                        near_dist <= 1
+                        and min_top1_confidence <= self.non_primary_replacement_min_char_confidence
+                    )
+
+                if allow_replacement:
                     decoded_word = near_word
                     replacement_applied = True
                     replacement_reason = "low-confidence-lexicon-fallback"

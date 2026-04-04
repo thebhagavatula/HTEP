@@ -4,6 +4,7 @@
 import os
 import json
 import pickle
+import re
 import cv2
 import numpy as np
 from pathlib import Path
@@ -25,7 +26,8 @@ class ICRTrainer:
     def __init__(
         self,
         dataset_dir="data/datasets/dataset_block",
-        model_dir="models/icr_block"
+        model_dir="models/icr_block",
+        strict_block_only=True,
     ):
         self.dataset_dir = Path(dataset_dir)
         self.model_dir = Path(model_dir)
@@ -36,6 +38,12 @@ class ICRTrainer:
 
         self.label_encoder = LabelEncoder()
         self.model = None
+        self.strict_block_only = strict_block_only
+
+    @staticmethod
+    def _is_clean_block_label(label: str) -> bool:
+        """Allow only canonical block classes (0-9, A-Z)."""
+        return bool(re.fullmatch(r"[0-9A-Z]", label))
 
     # --------------------------------------------------
     # DATA LOADING (UNCHANGED)
@@ -44,12 +52,17 @@ class ICRTrainer:
     def _load_data_from_dir(self, directory: Path):
         images = []
         labels = []
+        skipped_labels = set()
 
         for char_dir in directory.iterdir():
             if not char_dir.is_dir():
                 continue
 
             label = char_dir.name
+
+            if self.strict_block_only and not self._is_clean_block_label(label):
+                skipped_labels.add(label)
+                continue
 
             for img_path in char_dir.iterdir():
                 if img_path.suffix.lower() not in (".png", ".jpg", ".jpeg"):
@@ -63,6 +76,13 @@ class ICRTrainer:
                 images.append(img)
                 labels.append(label)
 
+        if skipped_labels:
+            print(
+                f"⚠ Skipped non-block classes ({len(skipped_labels)}): "
+                f"{sorted(skipped_labels)[:10]}"
+                + (" ..." if len(skipped_labels) > 10 else "")
+            )
+
         return np.array(images), labels
 
     def load_dataset(self):
@@ -70,6 +90,9 @@ class ICRTrainer:
 
         # Load all data from the dataset_block directory
         X_all, y_all = self._load_data_from_dir(self.dataset_dir)
+
+        if len(set(y_all)) < 2:
+            raise ValueError("Not enough classes after filtering. Check dataset labels.")
 
         # Create train/test split (80/20)
         from sklearn.model_selection import train_test_split
@@ -185,13 +208,13 @@ class ICRTrainer:
 # SAME quick_train() YOU USED BEFORE
 # --------------------------------------------------
 
-def quick_train(model_type="cnn", epochs=20):
+def quick_train(model_type="cnn", epochs=20, strict_block_only=True):
     if model_type != "cnn":
         raise ValueError("Only CNN is supported for block ICR")
 
-    trainer = ICRTrainer()
+    trainer = ICRTrainer(strict_block_only=strict_block_only)
     trainer.train(epochs=epochs)
 
 
 if __name__ == "__main__":
-    quick_train("cnn", epochs=20)
+    quick_train("cnn", epochs=20, strict_block_only=True)

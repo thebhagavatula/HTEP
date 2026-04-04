@@ -116,10 +116,12 @@ class BlockTextParser:
         enable_english_layer: bool = True,
         similarity_cutoff: float = 0.84,
         english_similarity_cutoff: float = 0.93,
+        english_fuzzy_requires_ocr_noise: bool = False,
     ):
         self.similarity_cutoff = similarity_cutoff
         self.english_similarity_cutoff = english_similarity_cutoff
         self.enable_english_layer = enable_english_layer
+        self.english_fuzzy_requires_ocr_noise = english_fuzzy_requires_ocr_noise
 
         self._medical_dictionary = sorted(set(dictionary_terms or DEFAULT_MEDICAL_DICTIONARY))
         self._medical_lookup = {
@@ -310,6 +312,8 @@ class BlockTextParser:
             cutoff=self.english_similarity_cutoff,
         )
         if close_english:
+            if self.english_fuzzy_requires_ocr_noise and token.isalpha():
+                return original, None
             corrected = self._english_lookup[close_english[0]]
             return self._apply_case(original, corrected), "english"
 

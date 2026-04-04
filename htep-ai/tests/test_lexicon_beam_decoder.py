@@ -5,6 +5,7 @@ def test_low_confidence_allows_lexicon_fallback():
     decoder = LexiconBeamDecoder(
         lexicon_terms=["hello", "name", "nilesh"],
         replacement_confidence_threshold=0.8,
+        non_primary_replacement_min_char_confidence=0.55,
     )
 
     candidates = [

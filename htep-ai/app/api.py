@@ -1,6 +1,7 @@
 # app/api.py
 
 from pathlib import Path
+import sys
 from flask import Flask, request, jsonify, send_from_directory
 from werkzeug.utils import secure_filename
 import traceback
@@ -14,6 +15,9 @@ import pytesseract
 BASE_DIR = Path(__file__).resolve().parent.parent
 WEB_DIR = BASE_DIR / "web"
 UPLOAD_DIR = BASE_DIR / "data" / "raw"
+
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
 
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -32,7 +36,11 @@ pytesseract.pytesseract.tesseract_cmd = (
 from src.ocr.extractor import OCRExtractor
 from src.recognition.icr_block_engine import BlockICREngine
 from src.recognition.icr_cursive_engine import CursiveICREngine
+<<<<<<< Updated upstream
 from src.nlp.block_parser import BlockTextParser
+=======
+from src.recognition.icr_llava_engine import LlavaICREngine
+>>>>>>> Stashed changes
 
 # -------------------------------
 # FLASK APP
@@ -50,8 +58,23 @@ app = Flask(
 
 ocr_engine = OCRExtractor()
 block_icr = BlockICREngine()
+<<<<<<< Updated upstream
 cursive_icr = CursiveICREngine()   # ✅ NEW
 block_parser = BlockTextParser()
+=======
+cursive_icr = None
+llava_icr = None
+
+try:
+    cursive_icr = CursiveICREngine()   # ✅ NEW
+except Exception as e:
+    print(f"⚠️ CursiveICREngine disabled: {e}")
+
+try:
+    llava_icr = LlavaICREngine()       # ✅ LLaVa Integration
+except Exception as e:
+    print(f"⚠️ LlavaICREngine disabled: {e}")
+>>>>>>> Stashed changes
 
 print("✅ Backend ready")
 
@@ -71,6 +94,14 @@ def serve_static(path):
 # -------------------------------
 # API ROUTE
 # -------------------------------
+
+def _preview(text: str, limit: int = 180) -> str:
+    if not text:
+        return ""
+    compact = " ".join(text.split())
+    if len(compact) <= limit:
+        return compact
+    return compact[:limit] + "..."
 
 @app.route("/upload", methods=["POST"])
 def upload_file():
@@ -103,6 +134,7 @@ def upload_file():
         block_parse_result = None
         cursive_text = ""
         cursive_conf = 0.0
+        llava_text = ""
 
         if suffix in [".png", ".jpg", ".jpeg"]:
             image = cv2.imread(str(file_path))
@@ -126,12 +158,23 @@ def upload_file():
                         print("⚠️ Block parser failed:", e)
 
                 # -------- CURSIVE ICR (EXPERIMENTAL) --------
-                try:
-                    cursive_result = cursive_icr.predict_paragraph(image)
-                    cursive_text = cursive_result.get("text", "")
-                    cursive_conf = cursive_result.get("confidence", 0.0)
-                except Exception as e:
-                    print("⚠️ Cursive ICR failed:", e)
+                if cursive_icr is not None:
+                    try:
+                        cursive_result = cursive_icr.predict_paragraph(image)
+                        cursive_text = cursive_result.get("text", "")
+                        cursive_conf = cursive_result.get("confidence", 0.0)
+                    except Exception as e:
+                        print("⚠️ Cursive ICR failed:", e)
+
+                # -------- LLAVA ICR (EXPERIMENTAL) --------
+                if llava_icr is not None:
+                    try:
+                        llava_result = llava_icr.predict_paragraph(image)
+                        llava_text = llava_result.get("text", "")
+                        llava_conf = llava_result.get("confidence", 0.0)
+                    except Exception as e:
+                        print("⚠️ LLaVa ICR failed:", e)
+                        llava_text = ""
 
         # ---------------- MERGE OUTPUT ----------------
         final_text = ocr_text.strip()
@@ -146,6 +189,7 @@ def upload_file():
                 + cursive_text.strip()
             )
 
+<<<<<<< Updated upstream
         response = {
             "text": final_text,
             "file": filename
@@ -165,6 +209,30 @@ def upload_file():
             }
 
         return jsonify(response)
+=======
+        # ⚠️ LLaVa is shown but NOT trusted
+        if llava_text and llava_text.strip():
+            final_text += (
+                "\n\n[LLaVa VLM - Experimental]\n"
+                + llava_text.strip()
+            )
+
+        # ---------------- DEBUG LOGS ----------------
+        print(f"🧾 OCR len={len(ocr_text)} preview={_preview(ocr_text)!r}")
+        print(f"🧾 BLOCK len={len(block_text)} preview={_preview(block_text)!r}")
+        print(f"🧾 CURSIVE len={len(cursive_text)} conf={cursive_conf:.3f} preview={_preview(cursive_text)!r}")
+        print(f"🧾 LLAVA len={len(llava_text)} preview={_preview(llava_text)!r}")
+        print(f"🧾 FINAL len={len(final_text)} preview={_preview(final_text)!r}")
+
+        return jsonify({
+            "text": final_text,
+            "file": filename,
+            "llava_text": llava_text,
+            "cursive_text": cursive_text,
+            "ocr_text": ocr_text,
+            "block_text": block_text
+        })
+>>>>>>> Stashed changes
 
     except Exception as e:
         print("ERROR DURING PROCESSING")

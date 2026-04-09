@@ -76,4 +76,4 @@ img = preprocess(img_path)
 pred = prediction_model.predict(img)
 text = decode(pred)
 
-print("📝 Predicted text:", text)
+print("Predicted text:", text)

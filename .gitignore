@@ -57,3 +57,19 @@ htep-ai/data/**
 # ---------------------------
 *.log
 *.tmp
+
+# ---------------------------
+# Environment variables
+# ---------------------------
+.env
+.env.*
+!.env.example
+
+# ---------------------------
+# Models & weights
+# ---------------------------
+*.h5
+*.hdf5
+*.keras
+htep-ai/models/**
+!htep-ai/models/.gitkeep

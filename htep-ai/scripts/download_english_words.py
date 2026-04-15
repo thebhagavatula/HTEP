@@ -1,11 +1,12 @@
 from pathlib import Path
 from urllib.request import urlopen
 
+from src.config import DICTIONARY_DIR
 
 DWYL_WORDS_URL = (
     "https://raw.githubusercontent.com/dwyl/english-words/master/words_alpha.txt"
 )
-TARGET_PATH = Path("data/dictionaries/english_words_alpha.txt")
+TARGET_PATH = DICTIONARY_DIR / "english_words_alpha.txt"
 
 
 def download_words(url: str = DWYL_WORDS_URL, target_path: Path = TARGET_PATH) -> Path:

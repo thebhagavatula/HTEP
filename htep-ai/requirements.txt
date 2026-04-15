@@ -15,11 +15,7 @@ numpy>=1.26.4,<2.1
 scikit-learn==1.5.2
 
 # Deep Learning (Optional - for CNN-based ICR)
-<<<<<<< Updated upstream
-tensorflow==2.20.0  # Recommended: GPU support
-=======
 tensorflow>=2.18.0,<2.19.0; python_version < "3.13"  # TF + NumPy compatible range
->>>>>>> Stashed changes
 # OR use: tensorflow-cpu==2.18.0  # CPU-only (lighter)
 # Alternative: torch==2.5.1  # PyTorch if preferred
 
@@ -62,14 +58,8 @@ jsonschema==4.23.0
 # Optional: Performance optimization
 numba>=0.60.0,<0.61.0  # Compatible with NumPy <2.1
 
-<<<<<<< Updated upstream
-#Website and backend
-flask-cors
-=======
 # Website and backend
-Flask==3.0.3
 Flask-Cors==5.0.0
 
 # LLaVa Integration
 ollama==0.4.5
->>>>>>> Stashed changes

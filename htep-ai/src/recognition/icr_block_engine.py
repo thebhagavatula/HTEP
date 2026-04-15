@@ -33,14 +33,19 @@ from src.segmentation.char_segmenter import segment_characters_with_spaces
 
 from src.icr.preprocessing import preprocess_single_char
 
+from src.config import MODELS_DIR
+
 class BlockICREngine:
     """
     CNN-based Block ICR inference engine.
     Uses your existing trained model files.
     """
 
-    def __init__(self, model_dir="models/icr_block"):
-        model_dir = Path(model_dir)
+    def __init__(self, model_dir=None):
+        if model_dir is None:
+            model_dir = MODELS_DIR / "icr_block"
+        else:
+            model_dir = Path(model_dir)
 
         # ---- MODEL ----
         model_path = model_dir / "icr_model.h5"
@@ -122,10 +127,6 @@ class BlockICREngine:
 
         if label.endswith("_block"):
             base = label[:-6]
-            return base[0] if base else "?"
-
-        if label.endswith("_cursive"):
-            base = label[:-8]
             return base[0] if base else "?"
 
         # Keep canonical single-character classes unchanged.

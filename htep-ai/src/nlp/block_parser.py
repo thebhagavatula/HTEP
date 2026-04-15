@@ -99,7 +99,9 @@ DEFAULT_COMMON_ENGLISH_DICTIONARY = [
 ]
 
 
-DEFAULT_ENGLISH_WORDS_PATH = Path("data/dictionaries/english_words_alpha.txt")
+from src.config import DICTIONARY_DIR
+
+DEFAULT_ENGLISH_WORDS_PATH = DICTIONARY_DIR / "english_words_alpha.txt"
 
 
 class BlockTextParser:

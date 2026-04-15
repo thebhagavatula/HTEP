@@ -13,21 +13,20 @@ import pytesseract
 # -------------------------------
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-WEB_DIR = BASE_DIR / "web"
-UPLOAD_DIR = BASE_DIR / "data" / "raw"
-
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
+from src.config import WEB_DIR, RAW_DATA_DIR, TESSERACT_CMD_PATH
+
+UPLOAD_DIR = RAW_DATA_DIR
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # -------------------------------
-# TESSERACT PATH (WINDOWS)
+# TESSERACT PATH
 # -------------------------------
 
-pytesseract.pytesseract.tesseract_cmd = (
-    r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-)
+if TESSERACT_CMD_PATH:
+    pytesseract.pytesseract.tesseract_cmd = TESSERACT_CMD_PATH
 
 # -------------------------------
 # IMPORT ENGINES
@@ -35,12 +34,8 @@ pytesseract.pytesseract.tesseract_cmd = (
 
 from src.ocr.extractor import OCRExtractor
 from src.recognition.icr_block_engine import BlockICREngine
-from src.recognition.icr_cursive_engine import CursiveICREngine
-<<<<<<< Updated upstream
 from src.nlp.block_parser import BlockTextParser
-=======
 from src.recognition.icr_llava_engine import LlavaICREngine
->>>>>>> Stashed changes
 
 # -------------------------------
 # FLASK APP
@@ -58,23 +53,14 @@ app = Flask(
 
 ocr_engine = OCRExtractor()
 block_icr = BlockICREngine()
-<<<<<<< Updated upstream
-cursive_icr = CursiveICREngine()   # ✅ NEW
 block_parser = BlockTextParser()
-=======
-cursive_icr = None
-llava_icr = None
 
-try:
-    cursive_icr = CursiveICREngine()   # ✅ NEW
-except Exception as e:
-    print(f"⚠️ CursiveICREngine disabled: {e}")
+llava_icr = None
 
 try:
     llava_icr = LlavaICREngine()       # ✅ LLaVa Integration
 except Exception as e:
     print(f"⚠️ LlavaICREngine disabled: {e}")
->>>>>>> Stashed changes
 
 print("✅ Backend ready")
 
@@ -128,12 +114,10 @@ def upload_file():
         else:
             ocr_text = ocr_engine.extract_from_image(str(file_path))
 
-        # ---------------- BLOCK + CURSIVE ICR (IMAGES ONLY) ----------------
+        # ---------------- BLOCK ICR (IMAGES ONLY) ----------------
         block_text = ""
         block_text_raw = ""
         block_parse_result = None
-        cursive_text = ""
-        cursive_conf = 0.0
         llava_text = ""
 
         if suffix in [".png", ".jpg", ".jpeg"]:
@@ -157,15 +141,6 @@ def upload_file():
                     except Exception as e:
                         print("⚠️ Block parser failed:", e)
 
-                # -------- CURSIVE ICR (EXPERIMENTAL) --------
-                if cursive_icr is not None:
-                    try:
-                        cursive_result = cursive_icr.predict_paragraph(image)
-                        cursive_text = cursive_result.get("text", "")
-                        cursive_conf = cursive_result.get("confidence", 0.0)
-                    except Exception as e:
-                        print("⚠️ Cursive ICR failed:", e)
-
                 # -------- LLAVA ICR (EXPERIMENTAL) --------
                 if llava_icr is not None:
                     try:
@@ -182,17 +157,25 @@ def upload_file():
         if block_text.strip():
             final_text += "\n\n[Block Handwritten]\n" + block_text.strip()
 
-        # ⚠️ Cursive is shown but NOT trusted
-        if cursive_text.strip():
+        # ⚠️ LLaVa is shown but NOT trusted
+        if llava_text and llava_text.strip():
             final_text += (
-                "\n\n[Cursive Handwritten – Experimental]\n"
-                + cursive_text.strip()
+                "\n\n[LLaVa VLM - Experimental]\n"
+                + llava_text.strip()
             )
 
-<<<<<<< Updated upstream
+        # ---------------- DEBUG LOGS ----------------
+        print(f"🧾 OCR len={len(ocr_text)} preview={_preview(ocr_text)!r}")
+        print(f"🧾 BLOCK len={len(block_text)} preview={_preview(block_text)!r}")
+        print(f"🧾 LLAVA len={len(llava_text)} preview={_preview(llava_text)!r}")
+        print(f"🧾 FINAL len={len(final_text)} preview={_preview(final_text)!r}")
+
         response = {
             "text": final_text,
-            "file": filename
+            "file": filename,
+            "llava_text": llava_text,
+            "ocr_text": ocr_text,
+            "block_text": block_text
         }
 
         if block_text_raw.strip() and block_parse_result is not None:
@@ -209,30 +192,6 @@ def upload_file():
             }
 
         return jsonify(response)
-=======
-        # ⚠️ LLaVa is shown but NOT trusted
-        if llava_text and llava_text.strip():
-            final_text += (
-                "\n\n[LLaVa VLM - Experimental]\n"
-                + llava_text.strip()
-            )
-
-        # ---------------- DEBUG LOGS ----------------
-        print(f"🧾 OCR len={len(ocr_text)} preview={_preview(ocr_text)!r}")
-        print(f"🧾 BLOCK len={len(block_text)} preview={_preview(block_text)!r}")
-        print(f"🧾 CURSIVE len={len(cursive_text)} conf={cursive_conf:.3f} preview={_preview(cursive_text)!r}")
-        print(f"🧾 LLAVA len={len(llava_text)} preview={_preview(llava_text)!r}")
-        print(f"🧾 FINAL len={len(final_text)} preview={_preview(final_text)!r}")
-
-        return jsonify({
-            "text": final_text,
-            "file": filename,
-            "llava_text": llava_text,
-            "cursive_text": cursive_text,
-            "ocr_text": ocr_text,
-            "block_text": block_text
-        })
->>>>>>> Stashed changes
 
     except Exception as e:
         print("ERROR DURING PROCESSING")

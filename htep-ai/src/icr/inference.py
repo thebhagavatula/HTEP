@@ -1,12 +1,10 @@
 # src/icr/inference.py
-# High-level ICR inference wrapper (BLOCK now, CURSIVE later)
+# High-level ICR inference wrapper
 
 import cv2
 from typing import List, Dict
 from src.recognition.icr_block_engine import BlockICREngine
 
-# Future import
-# from src.recognition.icr_cursive_engine import CursiveICREngine
 
 
 class ICRInference:
@@ -18,10 +16,6 @@ class ICRInference:
     def __init__(self):
         self.block_engine = BlockICREngine()
 
-        # Placeholder for future
-        self.cursive_engine = None
-        # self.cursive_engine = CursiveICREngine()
-
     # --------------------------------------------------
     # SINGLE CHARACTER
     # --------------------------------------------------
@@ -30,16 +24,10 @@ class ICRInference:
         """
         Predict a single character image.
 
-        style: 'block' | 'cursive'
+        style: 'block'
         """
         if style == "block":
             return self.block_engine.predict_char(char_img)
-
-        elif style == "cursive":
-            if not self.cursive_engine:
-                raise NotImplementedError("Cursive ICR not available yet")
-            return self.cursive_engine.predict_char(char_img)
-
         else:
             raise ValueError(f"Unknown ICR style: {style}")
 
@@ -53,12 +41,6 @@ class ICRInference:
         """
         if style == "block":
             return self.block_engine.predict_word(char_images)
-
-        elif style == "cursive":
-            if not self.cursive_engine:
-                raise NotImplementedError("Cursive ICR not available yet")
-            return self.cursive_engine.predict_word(char_images)
-
         else:
             raise ValueError(f"Unknown ICR style: {style}")
 

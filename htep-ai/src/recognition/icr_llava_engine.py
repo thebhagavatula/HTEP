@@ -3,18 +3,20 @@ import tempfile
 import pathlib
 import ollama
 
+from src.config import LLAVA_MODEL_TAG
+
 class LlavaICREngine:
     """
     LLaVa-based ICR engine using the local Ollama API.
     Used for inferring text directly from image snippets via vision-language models.
     """
 
-    def __init__(self, model_name="llava"):
+    def __init__(self, model_name=None):
         """
         Initializes the LLaVa engine.
         :param model_name: The tag used in Ollama (default is 'llava', could be 'llava:13b')
         """
-        self.model_name = model_name
+        self.model_name = model_name or LLAVA_MODEL_TAG
         self._system_prompt = (
             "You are an OCR transcriber for handwritten medical notes. "
             "Transcribe text exactly as written in the image. "

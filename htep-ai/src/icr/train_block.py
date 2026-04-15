@@ -18,6 +18,8 @@ from tensorflow import keras
 from tensorflow.keras import layers, models
 
 
+from src.config import DATA_DIR, MODELS_DIR
+
 class ICRTrainer:
     """
     CNN trainer for BLOCK character recognition.
@@ -25,10 +27,15 @@ class ICRTrainer:
 
     def __init__(
         self,
-        dataset_dir="data/datasets/dataset_block",
-        model_dir="models/icr_block",
+        dataset_dir=None,
+        model_dir=None,
         strict_block_only=True,
     ):
+        if dataset_dir is None:
+            dataset_dir = DATA_DIR / "datasets" / "dataset_block"
+        if model_dir is None:
+            model_dir = MODELS_DIR / "icr_block"
+            
         self.dataset_dir = Path(dataset_dir)
         self.model_dir = Path(model_dir)
         self.model_dir.mkdir(parents=True, exist_ok=True)

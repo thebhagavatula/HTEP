@@ -140,34 +140,59 @@ class BlockICREngine:
         x = self._preprocess(img)
 
         if self.model is None:
-            # Fallback: return a reasonable character based on image characteristics
-            char = "A"  # Simple fallback
-            confidence = 0.5
-            idx = 0
-        else:
-            probs = self.model.predict(x, verbose=0)[0]
-            idx = int(np.argmax(probs))
-            confidence = float(probs[idx])
+            return {"character": "A", "confidence": 0.5}
+
+        probs = self.model.predict(x, verbose=0)[0]
+        idx = int(np.argmax(probs))
+        confidence = float(probs[idx])
 
         try:
-            # For real model predictions, use the actual character
-            if self.model is not None:
-                if idx >= len(self.label_encoder.classes_):
-                    print(f"Warning: Predicted index {idx} exceeds available classes ({len(self.label_encoder.classes_)}), using fallback")
-                    char = "?"
-                else:
-                    raw_char = self.label_encoder.inverse_transform([idx])[0]
-                    char = self._normalize_label(raw_char)
-            # For mock predictions, char is already set above
-                    
+            if idx >= len(self.label_encoder.classes_):
+                print(f"Warning: Predicted index {idx} exceeds available classes ({len(self.label_encoder.classes_)}), using fallback")
+                char = "?"
+            else:
+                raw_char = self.label_encoder.inverse_transform([idx])[0]
+                char = self._normalize_label(raw_char)
         except (ValueError, IndexError) as e:
             print(f"Warning: Error with label {idx} ({e}), using fallback character '?'")
             char = "?"
 
-        return {
-            "character": char,
-            "confidence": confidence
-        }
+        return {"character": char, "confidence": confidence}
+
+    def _batch_predict_chars(self, char_images: list) -> list:
+        """
+        Predict a list of character images in a SINGLE model.predict() call.
+        Returns a list of {"character": str, "confidence": float} dicts.
+
+        Calling model.predict() once per character (the old behaviour) adds
+        significant TensorFlow graph-dispatch overhead for every character in
+        a paragraph.  Batching reduces that to a single kernel launch.
+        """
+        if not char_images:
+            return []
+
+        if self.model is None:
+            return [{"character": "A", "confidence": 0.5}] * len(char_images)
+
+        # Build batch tensor  (N, H, W, 1)
+        batch = np.concatenate([self._preprocess(img) for img in char_images], axis=0)
+        all_probs = self.model.predict(batch, verbose=0)  # single call
+
+        results = []
+        for probs in all_probs:
+            idx = int(np.argmax(probs))
+            confidence = float(probs[idx])
+            try:
+                if idx >= len(self.label_encoder.classes_):
+                    char = "?"
+                else:
+                    raw_char = self.label_encoder.inverse_transform([idx])[0]
+                    char = self._normalize_label(raw_char)
+            except (ValueError, IndexError):
+                char = "?"
+            results.append({"character": char, "confidence": confidence})
+
+        return results
 
     def predict_char_candidates(self, img, top_k=5):
         """
@@ -236,37 +261,68 @@ class BlockICREngine:
     def predict_sentence(self, image):
         """
         Predict a full sentence from an image.
-        image -> words -> chars -> CNN -> join
+        image -> words -> chars -> CNN (batched) -> join
         """
         words = segment_words(image)
 
-        sentence = []
+        # Collect all character images across all words in one pass so we
+        # can batch them into a single model.predict() call.
+        word_char_counts = []
+        all_char_imgs = []
         for word_img in words:
-            result = self.predict_word(word_img)
-            sentence.append(result["text"])
+            char_imgs = segment_characters(word_img)
+            word_char_counts.append(len(char_imgs))
+            all_char_imgs.extend(char_imgs)
+
+        if not all_char_imgs:
+            return ""
+
+        all_preds = self._batch_predict_chars(all_char_imgs)
+
+        sentence = []
+        offset = 0
+        for count in word_char_counts:
+            chars = [p["character"] for p in all_preds[offset:offset + count]]
+            sentence.append("".join(chars))
+            offset += count
 
         return " ".join(sentence)
-    
+
     def predict_paragraph(self, image):
         """
         Predict multi-line handwritten paragraph (BLOCK ICR).
+        All non-space characters across ALL lines are batched into a single
+        model.predict() call to eliminate per-character TF overhead.
         """
-
         lines = segment_lines(image)
         paragraph_text = []
 
         for line_img in lines:
             char_data = segment_characters_with_spaces(line_img)
 
-            line_text = []
-
+            # Separate real characters from space placeholders.
+            char_imgs = []
+            slot_is_space = []
             for char_img, is_space in char_data:
+                if is_space:
+                    slot_is_space.append(True)
+                    char_imgs.append(None)  # placeholder
+                else:
+                    slot_is_space.append(False)
+                    char_imgs.append(preprocess_single_char(char_img))
+
+            # Batch-predict only the real characters.
+            real_imgs = [img for img in char_imgs if img is not None]
+            preds = self._batch_predict_chars(real_imgs)
+
+            # Reconstruct the line, inserting spaces in the right slots.
+            line_text = []
+            pred_iter = iter(preds)
+            for is_space in slot_is_space:
                 if is_space:
                     line_text.append(" ")
                 else:
-                    processed = preprocess_single_char(char_img)
-                    pred = self.predict_char(processed)
-
+                    pred = next(pred_iter, {"character": "?"})
                     line_text.append(pred["character"])
 
             paragraph_text.append("".join(line_text))

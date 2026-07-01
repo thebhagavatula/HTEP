@@ -20,6 +20,8 @@ ICR_TRAINING_DIR = DATA_DIR / "icr_training"
 DICTIONARY_DIR = DATA_DIR / "dictionaries"
 SAMPLE_DATA_DIR = DATA_DIR / "sample"
 
+OCR_ENGINE = "paddle"  # switch to "tesseract" anytime to roll back instantly
+
 # Tesseract Configuration
 TESSERACT_CMD_PATH = os.getenv("TESSERACT_CMD_PATH", r"C:\Program Files\Tesseract-OCR\tesseract.exe")
 

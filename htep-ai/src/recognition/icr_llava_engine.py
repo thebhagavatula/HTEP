@@ -1,6 +1,8 @@
 import cv2
+import time
 import tempfile
 import pathlib
+import threading
 import ollama
 
 from src.config import LLAVA_MODEL_TAG
@@ -11,12 +13,19 @@ class LlavaICREngine:
     Used for inferring text directly from image snippets via vision-language models.
     """
 
-    def __init__(self, model_name=None):
+    # Maximum seconds to wait for a single Ollama inference call.
+    # On CPU, LLaVA 7B can take many minutes; cap it so one upload
+    # cannot block the entire server indefinitely.
+    INFERENCE_TIMEOUT_SECONDS = 60
+
+    def __init__(self, model_name=None, timeout: int = None):
         """
         Initializes the LLaVa engine.
         :param model_name: The tag used in Ollama (default is 'llava', could be 'llava:13b')
+        :param timeout:    Max seconds per inference call (default: INFERENCE_TIMEOUT_SECONDS)
         """
         self.model_name = model_name or LLAVA_MODEL_TAG
+        self.timeout = timeout if timeout is not None else self.INFERENCE_TIMEOUT_SECONDS
         self._system_prompt = (
             "You are an OCR transcriber for handwritten medical notes. "
             "Transcribe text exactly as written in the image. "
@@ -56,16 +65,13 @@ class LlavaICREngine:
         if max(gray.shape[:2]) < 900:
             gray = cv2.resize(gray, None, fx=1.8, fy=1.8, interpolation=cv2.INTER_CUBIC)
 
-        # Variant 1: normalized grayscale
+        # Single normalized-grayscale variant.
+        # Running two variants (grayscale + binarized) doubles inference time
+        # on a CPU-only Ollama setup (each call can take 10-30 min on 7B models).
+        # One variant is sufficient for typical handwritten medical notes.
         gray_norm = cv2.normalize(gray, None, 0, 255, cv2.NORM_MINMAX)
 
-        # Variant 2: adaptive threshold to emphasize pen strokes
-        gray_blur = cv2.GaussianBlur(gray_norm, (3, 3), 0)
-        bw = cv2.adaptiveThreshold(
-            gray_blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 11
-        )
-
-        return [gray_norm, bw]
+        return [gray_norm]
 
     def _extract_response_text(self, response) -> str:
         # ollama-python can return dict-like or typed objects depending on version.
@@ -90,30 +96,59 @@ class LlavaICREngine:
         return cleaned
 
     def _run_ocr(self, image_path: str) -> str:
-        response = ollama.chat(
-            model=self.model_name,
-            messages=[
-                {
-                    "role": "system",
-                    "content": self._system_prompt
-                },
-                {
-                    "role": "user",
-                    "content": (
-                        "Read this image and return exact visible text only. "
-                        "Preserve line breaks. If unreadable, return best effort characters."
-                    ),
-                    "images": [image_path]
-                }
-            ],
-            options={
-                "temperature": 0,
-                "top_p": 0.1,
-                "repeat_penalty": 1.05,
-                "seed": 7
-            }
-        )
-        return self._clean_text(self._extract_response_text(response))
+        """
+        Run Ollama inference with a wall-clock timeout.
+        If the model does not respond within `self.timeout` seconds the call
+        is abandoned and an empty string is returned, preventing the Flask
+        server from blocking indefinitely on CPU-only LLaVA inference.
+        """
+        result_holder = [None]
+        error_holder = [None]
+
+        def _call():
+            try:
+                t0 = time.time()
+                response = ollama.chat(
+                    model=self.model_name,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": self._system_prompt
+                        },
+                        {
+                            "role": "user",
+                            "content": (
+                                "Read this image and return exact visible text only. "
+                                "Preserve line breaks. If unreadable, return best effort characters."
+                            ),
+                            "images": [image_path]
+                        }
+                    ],
+                    options={
+                        "temperature": 0,
+                        "top_p": 0.1,
+                        "repeat_penalty": 1.05,
+                        "seed": 7
+                    }
+                )
+                elapsed = time.time() - t0
+                print(f"⏱️ LLaVA inference completed in {elapsed:.1f}s")
+                result_holder[0] = self._clean_text(self._extract_response_text(response))
+            except Exception as exc:
+                error_holder[0] = exc
+
+        thread = threading.Thread(target=_call, daemon=True)
+        thread.start()
+        thread.join(timeout=self.timeout)
+
+        if thread.is_alive():
+            print(f"⚠️ LLaVA inference exceeded {self.timeout}s timeout — skipping")
+            return ""
+
+        if error_holder[0] is not None:
+            raise error_holder[0]
+
+        return result_holder[0] or ""
 
     def predict_paragraph(self, img) -> dict:
         """

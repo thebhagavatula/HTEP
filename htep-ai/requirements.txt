@@ -1,8 +1,15 @@
 # Core OCR and Image Processing
 opencv-python==4.10.0.84
-pytesseract==0.3.13
 pdf2image==1.17.0
 Pillow==10.4.0
+
+# PaddleOCR (primary OCR engine)
+paddleocr>=3.7.0
+paddlepaddle>=3.3.0
+
+# Tesseract (backup OCR engine - set OCR_ENGINE="tesseract" in src/config.py)
+pytesseract==0.3.13
+
 
 # API server
 Flask==3.1.1

@@ -2,11 +2,11 @@
 
 from pathlib import Path
 import sys
+import time
 from flask import Flask, request, jsonify, send_from_directory
 from werkzeug.utils import secure_filename
 import traceback
 import cv2
-import pytesseract
 
 # -------------------------------
 # PATHS
@@ -16,17 +16,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
-from src.config import WEB_DIR, RAW_DATA_DIR, TESSERACT_CMD_PATH
+from src.config import WEB_DIR, RAW_DATA_DIR
 
 UPLOAD_DIR = RAW_DATA_DIR
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # -------------------------------
-# TESSERACT PATH
+# OCR ENGINE (configured in src/config.py)
 # -------------------------------
-
-if TESSERACT_CMD_PATH:
-    pytesseract.pytesseract.tesseract_cmd = TESSERACT_CMD_PATH
 
 # -------------------------------
 # IMPORT ENGINES
@@ -58,11 +55,11 @@ block_parser = BlockTextParser()
 llava_icr = None
 
 try:
-    llava_icr = LlavaICREngine()       # ✅ LLaVa Integration
+    llava_icr = LlavaICREngine()       # LLaVa Integration
 except Exception as e:
-    print(f"⚠️ LlavaICREngine disabled: {e}")
+    print(f"LlavaICREngine disabled: {e}")
 
-print("✅ Backend ready")
+print("Backend ready")
 
 # -------------------------------
 # WEBSITE ROUTES
@@ -103,16 +100,19 @@ def upload_file():
         file_path = UPLOAD_DIR / filename
         file.save(file_path)
 
-        print(f"📥 File received: {filename}")
+        print(f"File received: {filename}")
+        request_start = time.time()
 
         suffix = file_path.suffix.lower()
 
         # ---------------- OCR ----------------
+        t0 = time.time()
         if suffix == ".pdf":
             pages = ocr_engine.extract_from_pdf(str(file_path))
             ocr_text = "\n".join(pages.values())
         else:
             ocr_text = ocr_engine.extract_from_image(str(file_path))
+        print(f"OCR completed in {time.time() - t0:.2f}s")
 
         # ---------------- BLOCK ICR (IMAGES ONLY) ----------------
         block_text = ""
@@ -125,30 +125,36 @@ def upload_file():
             if image is not None:
 
                 # -------- BLOCK ICR --------
+                t0 = time.time()
                 block_text = block_icr.predict_paragraph(image)
 
                 # Fallback to sentence if single-line
                 if "\n" not in block_text:
                     block_text = block_icr.predict_sentence(image)
+                print(f"Block ICR completed in {time.time() - t0:.2f}s")
 
                 block_text_raw = block_text
 
                 # -------- BLOCK PARSER (SPACY + SCISPACY DICTIONARY) --------
                 if block_text.strip():
                     try:
+                        t0 = time.time()
                         block_parse_result = block_parser.parse(block_text)
                         block_text = block_parse_result.get("corrected_text", block_text)
+                        print(f"Block parser completed in {time.time() - t0:.2f}s")
                     except Exception as e:
-                        print("⚠️ Block parser failed:", e)
+                        print("Block parser failed:", e)
 
                 # -------- LLAVA ICR (EXPERIMENTAL) --------
                 if llava_icr is not None:
                     try:
+                        t0 = time.time()
                         llava_result = llava_icr.predict_paragraph(image)
                         llava_text = llava_result.get("text", "")
                         llava_conf = llava_result.get("confidence", 0.0)
+                        print(f"LLaVA ICR completed in {time.time() - t0:.2f}s")
                     except Exception as e:
-                        print("⚠️ LLaVa ICR failed:", e)
+                        print("LLaVa ICR failed:", e)
                         llava_text = ""
 
         # ---------------- MERGE OUTPUT ----------------
@@ -157,7 +163,7 @@ def upload_file():
         if block_text.strip():
             final_text += "\n\n[Block Handwritten]\n" + block_text.strip()
 
-        # ⚠️ LLaVa is shown but NOT trusted
+        # LLaVa is shown but NOT trusted
         if llava_text and llava_text.strip():
             final_text += (
                 "\n\n[LLaVa VLM - Experimental]\n"
@@ -165,10 +171,11 @@ def upload_file():
             )
 
         # ---------------- DEBUG LOGS ----------------
-        print(f"🧾 OCR len={len(ocr_text)} preview={_preview(ocr_text)!r}")
-        print(f"🧾 BLOCK len={len(block_text)} preview={_preview(block_text)!r}")
-        print(f"🧾 LLAVA len={len(llava_text)} preview={_preview(llava_text)!r}")
-        print(f"🧾 FINAL len={len(final_text)} preview={_preview(final_text)!r}")
+        print(f"OCR len={len(ocr_text)} preview={_preview(ocr_text)!r}")
+        print(f"BLOCK len={len(block_text)} preview={_preview(block_text)!r}")
+        print(f"LLAVA len={len(llava_text)} preview={_preview(llava_text)!r}")
+        print(f"FINAL len={len(final_text)} preview={_preview(final_text)!r}")
+        print(f"Total request time: {time.time() - request_start:.2f}s")
 
         response = {
             "text": final_text,

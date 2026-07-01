@@ -1,184 +1,137 @@
 # src/ocr/extractor.py
 
 import os
-import cv2
-import pytesseract
-from pdf2image import convert_from_path
-from PIL import Image
-import logging
-from typing import List, Dict, Optional
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# ── PaddlePaddle 3.3.x oneDNN compatibility fix ──────────────────────
+# PaddlePaddle 3.3.1 has a known bug where the PIR executor fails to
+# convert certain attributes for the oneDNN (MKLDNN) backend, raising:
+#   NotImplementedError: ConvertPirAttribute2RuntimeAttribute not support
+#   [pir::ArrayAttribute<pir::DoubleAttribute>]
+# Disabling MKLDNN before any paddle import side-steps this entirely.
+os.environ.setdefault("FLAGS_use_mkldnn", "0")
+os.environ.setdefault("PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT", "0")
+
+# Skip network connectivity check on PaddleX model download
+os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
+
+from pathlib import Path
+from typing import Dict
+import cv2
+import numpy as np
+from pdf2image import convert_from_path
+
+# Import config toggle
+try:
+    from src.config import OCR_ENGINE
+except ImportError:
+    OCR_ENGINE = "paddle"  # default if not set in config
 
 
 class OCRExtractor:
     """
-    OCR Extractor for medical documents.
-    Handles both PDF and image files.
+    Unified OCR extractor. Public interface matches what api.py expects:
+      - extract_from_pdf(path) -> Dict[int, str]   {page_num: text}
+      - extract_from_image(path) -> str
+    Internally routes to PaddleOCR (primary) or Tesseract (backup)
+    based on OCR_ENGINE config in src/config.py.
     """
 
-    def __init__(self, tesseract_path: Optional[str] = None):
+    def __init__(self, lang: str = "en", device: str = "cpu"):
+        self.engine_name = OCR_ENGINE
+
+        if self.engine_name == "paddle":
+            from paddleocr import PaddleOCR
+
+            # PaddleOCR v3.x API:
+            #   - `use_gpu` removed → use `device` ("cpu", "gpu:0", etc.)
+            #   - disable heavy pre-processing models we don't need for
+            #     straightforward scanned documents (saves ~30s startup)
+            self._paddle = PaddleOCR(
+                lang=lang,
+                device=device,
+                use_doc_orientation_classify=False,
+                use_doc_unwarping=False,
+                use_textline_orientation=False,
+            )
+
+        elif self.engine_name == "tesseract":
+            import pytesseract
+            from src.config import TESSERACT_CMD_PATH
+            if TESSERACT_CMD_PATH:
+                pytesseract.pytesseract.tesseract_cmd = TESSERACT_CMD_PATH
+            self._pytesseract = pytesseract
+
+        else:
+            raise ValueError(f"Unknown OCR_ENGINE: {self.engine_name}")
+
+        print(f"[OK] OCRExtractor initialized with engine: {self.engine_name}")
+
+    # ──────────────── INTERNAL HELPERS ────────────────
+
+    def _paddle_ocr_array(self, image_input) -> str:
         """
-        Initialize OCR extractor.
-
-        Args:
-            tesseract_path: Path to Tesseract executable (if not in PATH)
+        Run PaddleOCR on an image (path string or numpy array).
+        PaddleOCR v3.x .predict() returns a list of OCRResult objects.
+        Each OCRResult is dict-like with keys: rec_texts, rec_scores, etc.
         """
-        if tesseract_path:
-            pytesseract.pytesseract.tesseract_cmd = tesseract_path
+        result = self._paddle.predict(image_input)
 
-        # OCR configuration for medical documents
-        self.config = r'--oem 3 --psm 6 -l eng'
+        if not result:
+            return ""
 
-    def extract_from_pdf(self, pdf_path: str) -> Dict[str, str]:
-        """
-        Extract text from PDF file.
+        page = result[0]  # first (and only) page result
+        texts = page.get("rec_texts", [])
 
-        Args:
-            pdf_path: Path to PDF file
+        if not texts:
+            return ""
 
-        Returns:
-            Dictionary with page numbers as keys and extracted text as values
-        """
-        if not os.path.exists(pdf_path):
-            raise FileNotFoundError(f"PDF file not found: {pdf_path}")
+        return "\n".join(texts)
 
-        logger.info(f"Processing PDF: {pdf_path}")
+    def _tesseract_ocr_array(self, image_array: np.ndarray) -> str:
+        """Run Tesseract on a numpy image array."""
+        gray = (
+            cv2.cvtColor(image_array, cv2.COLOR_BGR2GRAY)
+            if len(image_array.shape) == 3
+            else image_array
+        )
+        return self._pytesseract.image_to_string(gray)
 
-        try:
-            # Convert PDF to images
-            pages = convert_from_path(pdf_path, dpi=300)
-            extracted_text = {}
+    def _ocr_array(self, image_input) -> str:
+        """Route to the active engine."""
+        if self.engine_name == "paddle":
+            return self._paddle_ocr_array(image_input)
+        else:
+            return self._tesseract_ocr_array(image_input)
 
-            for page_num, page_image in enumerate(pages, 1):
-                logger.info(f"Processing page {page_num}/{len(pages)}")
-
-                # Extract text from page
-                text = self._extract_from_image(page_image)
-                extracted_text[f"page_{page_num}"] = text
-
-            logger.info(f"Successfully processed {len(pages)} pages")
-            return extracted_text
-
-        except Exception as e:
-            logger.error(f"Error processing PDF {pdf_path}: {str(e)}")
-            raise
+    # ──────────────── PUBLIC API ────────────────
 
     def extract_from_image(self, image_path: str) -> str:
         """
-        Extract text from image file.
-
-        Args:
-            image_path: Path to image file
-
-        Returns:
-            Extracted text as string
+        Called by api.py as: ocr_text = ocr_engine.extract_from_image(str(file_path))
+        Returns plain text string.
         """
-        if not os.path.exists(image_path):
-            raise FileNotFoundError(f"Image file not found: {image_path}")
+        if self.engine_name == "paddle":
+            # PaddleOCR v3.x can accept file paths directly
+            return self._paddle_ocr_array(str(image_path)).strip()
 
-        logger.info(f"Processing image: {image_path}")
+        # Tesseract path: load image as array
+        image = cv2.imread(str(image_path))
+        if image is None:
+            raise ValueError(f"Could not read image: {image_path}")
+        return self._ocr_array(image).strip()
 
-        try:
-            image = Image.open(image_path)
-            return self._extract_from_image(image)
-        except Exception as e:
-            logger.error(f"Error processing image {image_path}: {str(e)}")
-            raise
-
-    def _extract_from_image(self, image: Image.Image) -> str:
+    def extract_from_pdf(self, pdf_path: str, dpi: int = 300) -> Dict[int, str]:
         """
-        Internal method to extract text from PIL Image.
-
-        Args:
-            image: PIL Image object
-
-        Returns:
-            Extracted text as string
+        Called by api.py as:
+            pages = ocr_engine.extract_from_pdf(str(file_path))
+            ocr_text = "\\n".join(pages.values())
+        Returns dict: {1: "page 1 text", 2: "page 2 text", ...}
         """
-        # Preprocess image for better OCR
-        processed_image = self._preprocess_image(image)
+        images = convert_from_path(str(pdf_path), dpi=dpi)
 
-        # Extract text using Tesseract
-        text = pytesseract.image_to_string(processed_image, config=self.config)
+        pages = {}
+        for i, page_img in enumerate(images, start=1):
+            page_array = cv2.cvtColor(np.array(page_img), cv2.COLOR_RGB2BGR)
+            pages[i] = self._ocr_array(page_array).strip()
 
-        return self._clean_text(text)
-
-    def _preprocess_image(self, image: Image.Image) -> Image.Image:
-        """
-        Preprocess image to improve OCR accuracy.
-
-        Args:
-            image: Input PIL Image
-
-        Returns:
-            Preprocessed PIL Image
-        """
-        # Convert PIL to OpenCV format
-        img_array = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-
-        # Convert to grayscale
-        gray = cv2.cvtColor(img_array, cv2.COLOR_BGR2GRAY)
-
-        # Apply noise reduction
-        denoised = cv2.medianBlur(gray, 3)
-
-        # Apply thresholding to get better contrast
-        _, thresh = cv2.threshold(denoised, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-
-        # Convert back to PIL
-        return Image.fromarray(thresh)
-
-    def _clean_text(self, text: str) -> str:
-        """
-        Clean extracted text.
-
-        Args:
-            text: Raw extracted text
-
-        Returns:
-            Cleaned text
-        """
-        if not text:
-            return ""
-
-        # Basic text cleaning
-        text = text.strip()
-
-        # Remove excessive whitespace
-        lines = [line.strip() for line in text.split('\n') if line.strip()]
-
-        return '\n'.join(lines)
-
-    def get_text_confidence(self, image: Image.Image) -> List[Dict]:
-        """
-        Get OCR confidence scores for debugging.
-
-        Args:
-            image: PIL Image object
-
-        Returns:
-            List of dictionaries with text and confidence scores
-        """
-        processed_image = self._preprocess_image(image)
-
-        # Get detailed OCR data
-        data = pytesseract.image_to_data(processed_image, output_type=pytesseract.Output.DICT)
-
-        results = []
-        for i in range(len(data['text'])):
-            if int(data['conf'][i]) > 30:  # Only include confident predictions
-                results.append({
-                    'text': data['text'][i],
-                    'confidence': data['conf'][i],
-                    'bbox': (data['left'][i], data['top'][i],
-                             data['width'][i], data['height'][i])
-                })
-
-        return results
-
-
-# Import numpy for image processing
-import numpy as np
+        return pages

@@ -28,6 +28,7 @@ tensorflow>=2.18.0,<2.19.0; python_version < "3.13"  # TF + NumPy compatible ran
 
 # Text Processing
 nltk==3.9.1
+rapidfuzz>=3.0.0
 
 # NLP parsing for block handwriting normalization
 spacy==3.7.5

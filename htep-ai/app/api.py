@@ -33,6 +33,8 @@ from src.ocr.extractor import OCRExtractor
 from src.recognition.icr_block_engine import BlockICREngine
 from src.nlp.block_parser import BlockTextParser
 from src.recognition.icr_llava_engine import LlavaICREngine
+from src.nlp.ocr_postprocessor import OCRPostProcessor
+from src.nlp.medical_extractor import MedicalDocExtractor
 
 # -------------------------------
 # FLASK APP
@@ -58,6 +60,22 @@ try:
     llava_icr = LlavaICREngine()       # LLaVa Integration
 except Exception as e:
     print(f"LlavaICREngine disabled: {e}")
+
+# OCR Post-Processor (drug/disease dictionaries + fuzzy matching)
+ocr_postprocessor = None
+try:
+    ocr_postprocessor = OCRPostProcessor()
+    print("[OK] OCRPostProcessor loaded")
+except Exception as e:
+    print(f"OCRPostProcessor disabled: {e}")
+
+medical_extractor = None
+if ocr_postprocessor:
+    try:
+        medical_extractor = MedicalDocExtractor(ocr_postprocessor.drugs, ocr_postprocessor.diseases)
+        print("[OK] MedicalDocExtractor loaded")
+    except Exception as e:
+        print(f"MedicalDocExtractor disabled: {e}")
 
 print("Backend ready")
 
@@ -160,15 +178,37 @@ def upload_file():
         # ---------------- MERGE OUTPUT ----------------
         final_text = ocr_text.strip()
 
-        if block_text.strip():
-            final_text += "\n\n[Block Handwritten]\n" + block_text.strip()
+        # ---------------- OCR POST-PROCESSING ----------------
+        post_result = None
+        matched_drugs = []
+        matched_diseases = []
+        post_corrections = []
 
-        # LLaVa is shown but NOT trusted
-        if llava_text and llava_text.strip():
-            final_text += (
-                "\n\n[LLaVa VLM - Experimental]\n"
-                + llava_text.strip()
-            )
+        if ocr_postprocessor is not None and final_text:
+            try:
+                t0 = time.time()
+                post_result = ocr_postprocessor.process(final_text)
+                final_text = post_result.get("corrected_text", final_text)
+                matched_drugs = post_result.get("matched_drugs", [])
+                matched_diseases = post_result.get("matched_diseases", [])
+                post_corrections = post_result.get("corrections", [])
+                print(f"Post-processing completed in {time.time() - t0:.2f}s")
+                print(f"  Drugs matched: {matched_drugs}")
+                print(f"  Diseases matched: {matched_diseases}")
+                print(f"  Corrections applied: {len(post_corrections)}")
+            except Exception as e:
+                print(f"Post-processing failed (falling back to raw OCR): {e}")
+                final_text = ocr_text.strip()
+
+        # ---------------- JSON EXTRACTION ----------------
+        extracted_data = {}
+        if medical_extractor is not None and final_text:
+            try:
+                t0 = time.time()
+                extracted_data = medical_extractor.extract(final_text)
+                print(f"JSON extraction completed in {time.time() - t0:.2f}s")
+            except Exception as e:
+                print(f"JSON extraction failed: {e}")
 
         # ---------------- DEBUG LOGS ----------------
         print(f"OCR len={len(ocr_text)} preview={_preview(ocr_text)!r}")
@@ -180,9 +220,12 @@ def upload_file():
         response = {
             "text": final_text,
             "file": filename,
-            "llava_text": llava_text,
             "ocr_text": ocr_text,
-            "block_text": block_text
+            "corrected_text": final_text,
+            "matched_drugs": matched_drugs,
+            "matched_diseases": matched_diseases,
+            "corrections": post_corrections,
+            "extracted_data": extracted_data,
         }
 
         if block_text_raw.strip() and block_parse_result is not None:

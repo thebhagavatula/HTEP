@@ -63,7 +63,7 @@
 body {
     background-color: var(--bg-color);
     color: var(--text-color);
-    font-family: 'Open Sans', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: 'Verdana', Tahoma, Geneva, Open Sans, sans-serif;
     display: flex;
     flex-direction: column;
     min-height: 100vh;
@@ -489,4 +489,272 @@ footer {
     font-size: 0.9rem;
     font-weight: bold;
     color: var(--text-color);
+}
+
+/* =======================================
+   STRUCTURED DATA CARDS
+======================================= */
+
+.card {
+    background: var(--content-box-bg);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px var(--step-shadow);
+    margin-top: 24px;
+    overflow: hidden;
+}
+
+.card-header {
+    background: linear-gradient(135deg, var(--hero-bg-start), var(--hero-bg-end));
+    color: white;
+    padding: 12px 20px;
+    font-weight: 600;
+    font-size: 1.05rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    padding: 20px;
+}
+
+.grid-item {
+    font-size: 0.95rem;
+    color: var(--text-color);
+}
+
+.grid-item strong {
+    color: var(--nav-link-color);
+    display: block;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+}
+
+.instructions-list {
+    margin: 0;
+    padding-left: 20px;
+    color: var(--text-color);
+    line-height: 1.6;
+}
+
+.instructions-list li {
+    margin-bottom: 8px;
+}
+
+/* =======================================
+   DETECTION SECTIONS (Drugs / Diseases)
+======================================= */
+
+.detection-section {
+    margin-top: 24px;
+    padding: 20px 24px;
+    background: var(--content-box-bg);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px var(--step-shadow);
+}
+
+.section-heading {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0 0 14px 0;
+    color: var(--text-color);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.section-heading i {
+    font-size: 1rem;
+    opacity: 0.7;
+}
+
+/* =======================================
+   TAG BADGES
+======================================= */
+
+.tag-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    cursor: default;
+}
+
+.tag:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12);
+}
+
+.tag i {
+    font-size: 0.8rem;
+    opacity: 0.8;
+}
+
+/* Drug tags — teal/green pill style */
+.tag-drug {
+    background: linear-gradient(135deg, #00b89420, #00b89410);
+    color: #00997a;
+    border: 1px solid #00b89440;
+}
+
+[data-theme="dark"] .tag-drug {
+    background: linear-gradient(135deg, #00b89430, #00b89418);
+    color: #4dd9b4;
+    border: 1px solid #00b89450;
+}
+
+/* Disease tags — warm amber/orange style */
+.tag-disease {
+    background: linear-gradient(135deg, #e67e2220, #e67e2210);
+    color: #c96a1b;
+    border: 1px solid #e67e2240;
+}
+
+[data-theme="dark"] .tag-disease {
+    background: linear-gradient(135deg, #e67e2230, #e67e2218);
+    color: #f0a356;
+    border: 1px solid #e67e2250;
+}
+
+/* =======================================
+   CORRECTIONS SECTION
+======================================= */
+
+.corrections-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-color);
+    text-align: left;
+    font-family: inherit;
+}
+
+.corrections-toggle:hover {
+    opacity: 0.8;
+}
+
+.corrections-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: 11px;
+    background: var(--btn-primary);
+    color: #ffffff;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.corrections-chevron {
+    margin-left: auto;
+    font-size: 0.8rem;
+    transition: transform 0.25s ease;
+    opacity: 0.5;
+}
+
+.corrections-body {
+    margin-top: 14px;
+    animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.corrections-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+}
+
+.corrections-table th {
+    text-align: left;
+    padding: 8px 12px;
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--footer-color);
+    border-bottom: 2px solid var(--text-content-border);
+}
+
+.corrections-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--text-content-border);
+    color: var(--text-color);
+}
+
+.corrections-table code {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    background: var(--text-content-bg);
+    color: var(--text-content-color);
+    font-family: 'Courier New', Courier, monospace;
+}
+
+.correction-type {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.correction-type-ocrrule {
+    background: #6c5ce720;
+    color: #6c5ce7;
+}
+
+[data-theme="dark"] .correction-type-ocrrule {
+    background: #6c5ce730;
+    color: #a29bfe;
+}
+
+.correction-type-drug {
+    background: #00b89420;
+    color: #00997a;
+}
+
+[data-theme="dark"] .correction-type-drug {
+    background: #00b89430;
+    color: #4dd9b4;
+}
+
+.correction-type-disease {
+    background: #e67e2220;
+    color: #c96a1b;
+}
+
+[data-theme="dark"] .correction-type-disease {
+    background: #e67e2230;
+    color: #f0a356;
 }

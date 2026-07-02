@@ -24,14 +24,94 @@
         <h1>Extraction Results</h1>
         <p class="subtitle" id="fileNameSub">Processing Complete</p>
         
-        <div class="content-box">
-            <div id="displayText" class="text-content">
-                Loading text...
+        <!-- Structured Data Display -->
+        <div id="structuredData" style="display: none;">
+            
+            <!-- Patient Info Card -->
+            <div class="card info-card">
+                <div class="card-header"><i class="fas fa-user-circle"></i> Patient Information</div>
+                <div class="card-grid">
+                    <div class="grid-item"><strong>Name:</strong> <span id="patName">-</span></div>
+                    <div class="grid-item"><strong>Age:</strong> <span id="patAge">-</span></div>
+                    <div class="grid-item"><strong>Gender:</strong> <span id="patGender">-</span></div>
+                    <div class="grid-item"><strong>Date:</strong> <span id="patDate">-</span></div>
+                    <div class="grid-item"><strong>Doctor:</strong> <span id="patDoc">-</span></div>
+                    <div class="grid-item"><strong>Hospital:</strong> <span id="patHosp">-</span></div>
+                </div>
             </div>
 
-            <div style="text-align: center; margin-top: 20px;">
-                <button class="btn" onclick="copyText()">Copy Text</button>
-                <a href="index.html" class="btn btn-secondary">Upload New</a>
+            <!-- Vitals Card -->
+            <div id="vitalsSection" class="card info-card" style="display: none;">
+                <div class="card-header"><i class="fas fa-heartbeat"></i> Vitals</div>
+                <div class="card-grid">
+                    <div class="grid-item"><strong>BP:</strong> <span id="vitBP">-</span></div>
+                    <div class="grid-item"><strong>Temp:</strong> <span id="vitTemp">-</span></div>
+                    <div class="grid-item"><strong>Pulse:</strong> <span id="vitPulse">-</span></div>
+                </div>
+            </div>
+
+            <!-- Diagnosis Tags (reusing existing styles) -->
+            <div id="diagnosisSection" class="detection-section" style="display: none;">
+                <h2 class="section-heading"><i class="fas fa-stethoscope"></i> Diagnosis</h2>
+                <div id="diagnosisTags" class="tag-container"></div>
+            </div>
+
+            <!-- Medicines Table -->
+            <div id="medicinesSection" class="detection-section" style="display: none;">
+                <h2 class="section-heading"><i class="fas fa-capsules"></i> Prescribed Medicines</h2>
+                <table class="corrections-table">
+                    <thead>
+                        <tr>
+                            <th>Medicine Name</th>
+                            <th>Dosage</th>
+                            <th>Frequency</th>
+                        </tr>
+                    </thead>
+                    <tbody id="medicinesBody"></tbody>
+                </table>
+            </div>
+
+            <!-- Instructions -->
+            <div id="instructionsSection" class="detection-section" style="display: none;">
+                <h2 class="section-heading"><i class="fas fa-clipboard-list"></i> Instructions</h2>
+                <ul id="instructionsList" class="instructions-list"></ul>
+            </div>
+            
+        </div>
+
+        <!-- Raw Text / Fallback -->
+        <div class="detection-section">
+            <button class="corrections-toggle" id="rawTextToggle">
+                <i class="fas fa-file-alt"></i> Raw OCR Text
+                <i class="fas fa-chevron-down corrections-chevron" id="rawTextChevron"></i>
+            </button>
+            <div id="rawTextBody" class="corrections-body" style="display: block;">
+                <div id="displayText" class="text-content">Loading text...</div>
+                <div style="text-align: center; margin-top: 15px;">
+                    <button class="btn" onclick="copyText()">Copy Text</button>
+                    <a href="index.html" class="btn btn-secondary">Upload New</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Corrections Applied -->
+        <div id="correctionsSection" class="detection-section" style="display: none;">
+            <button class="corrections-toggle" id="correctionsToggle">
+                <i class="fas fa-wrench"></i> Dictionary Match & Corrections
+                <span id="correctionsCount" class="corrections-count">0</span>
+                <i class="fas fa-chevron-down corrections-chevron" id="correctionsChevron"></i>
+            </button>
+            <div id="correctionsBody" class="corrections-body" style="display: none;">
+                <table class="corrections-table">
+                    <thead>
+                        <tr>
+                            <th>Original</th>
+                            <th>Matched</th>
+                            <th>Type</th>
+                        </tr>
+                    </thead>
+                    <tbody id="correctionsTableBody"></tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -84,7 +164,175 @@
             } else {
                 textContainer.innerText = "No text found.";
             }
+
+            // --- Load full response data (drugs, diseases, corrections, extracted JSON) ---
+            const responseRaw = localStorage.getItem('htepResponse');
+            if (responseRaw) {
+                try {
+                    const data = JSON.parse(responseRaw);
+                    
+                    if (data.extracted_data && Object.keys(data.extracted_data).length > 0) {
+                        renderStructuredData(data.extracted_data);
+                    } else {
+                        // Fallback to legacy
+                        renderDrugs(data.matched_drugs || []);
+                        renderDiseases(data.matched_diseases || []);
+                    }
+                    
+                    renderCorrections(data.corrections || []);
+                } catch (e) {
+                    console.warn('Could not parse htepResponse:', e);
+                }
+            }
+
+            // --- Toggles ---
+            setupToggle('correctionsToggle', 'correctionsBody', 'correctionsChevron');
+            setupToggle('rawTextToggle', 'rawTextBody', 'rawTextChevron');
         });
+
+        function setupToggle(toggleId, bodyId, chevronId) {
+            const toggle = document.getElementById(toggleId);
+            if (toggle) {
+                toggle.addEventListener('click', () => {
+                    const body = document.getElementById(bodyId);
+                    const chevron = document.getElementById(chevronId);
+                    if (body.style.display === 'none') {
+                        body.style.display = 'block';
+                        if (chevron) chevron.style.transform = 'rotate(180deg)';
+                    } else {
+                        body.style.display = 'none';
+                        if (chevron) chevron.style.transform = 'rotate(0deg)';
+                    }
+                });
+            }
+        }
+
+        function renderStructuredData(ext) {
+            document.getElementById('structuredData').style.display = 'block';
+            
+            // Patient Info
+            document.getElementById('patName').innerText = ext.patient_name || '-';
+            document.getElementById('patAge').innerText = ext.age || '-';
+            document.getElementById('patGender').innerText = ext.gender || '-';
+            document.getElementById('patDate').innerText = ext.date || '-';
+            document.getElementById('patDoc').innerText = ext.doctor_name || '-';
+            document.getElementById('patHosp').innerText = ext.hospital || '-';
+
+            // Vitals
+            if (ext.vitals && Object.keys(ext.vitals).length > 0) {
+                document.getElementById('vitalsSection').style.display = 'block';
+                document.getElementById('vitBP').innerText = ext.vitals.bp || '-';
+                document.getElementById('vitTemp').innerText = ext.vitals.temp || '-';
+                document.getElementById('vitPulse').innerText = ext.vitals.pulse || '-';
+            }
+
+            // Diagnosis
+            if (ext.diagnosis && ext.diagnosis.length > 0) {
+                const diagSec = document.getElementById('diagnosisSection');
+                const diagCont = document.getElementById('diagnosisTags');
+                diagSec.style.display = 'block';
+                ext.diagnosis.forEach(d => {
+                    const tag = document.createElement('span');
+                    tag.className = 'tag tag-disease';
+                    tag.innerHTML = '<i class="fas fa-stethoscope"></i> ' + escapeHtml(d);
+                    diagCont.appendChild(tag);
+                });
+            }
+
+            // Medicines
+            if (ext.medicines && ext.medicines.length > 0) {
+                const medSec = document.getElementById('medicinesSection');
+                const medBody = document.getElementById('medicinesBody');
+                medSec.style.display = 'block';
+                ext.medicines.forEach(m => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><strong>${escapeHtml(m.name || '-')}</strong></td>
+                        <td>${escapeHtml(m.dosage || '-')}</td>
+                        <td>${escapeHtml(m.frequency || '-')}</td>
+                    `;
+                    medBody.appendChild(tr);
+                });
+            }
+
+            // Instructions
+            if (ext.instructions && ext.instructions.length > 0) {
+                const instSec = document.getElementById('instructionsSection');
+                const instList = document.getElementById('instructionsList');
+                instSec.style.display = 'block';
+                ext.instructions.forEach(i => {
+                    const li = document.createElement('li');
+                    li.innerText = i;
+                    instList.appendChild(li);
+                });
+            }
+            
+            // Hide raw text body by default if structured data exists
+            document.getElementById('rawTextBody').style.display = 'none';
+        }
+
+        // Legacy functions kept for fallback
+        function renderDrugs(drugs) {
+            if (!drugs || drugs.length === 0) return;
+            document.getElementById('structuredData').style.display = 'block';
+            const medSec = document.getElementById('medicinesSection');
+            const medBody = document.getElementById('medicinesBody');
+            medSec.style.display = 'block';
+            drugs.forEach(d => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td><strong>${escapeHtml(d)}</strong></td><td>-</td><td>-</td>`;
+                medBody.appendChild(tr);
+            });
+        }
+
+        function renderDiseases(diseases) {
+            if (!diseases || diseases.length === 0) return;
+            document.getElementById('structuredData').style.display = 'block';
+            const diagSec = document.getElementById('diagnosisSection');
+            const diagCont = document.getElementById('diagnosisTags');
+            diagSec.style.display = 'block';
+            diseases.forEach(d => {
+                const tag = document.createElement('span');
+                tag.className = 'tag tag-disease';
+                tag.innerHTML = '<i class="fas fa-stethoscope"></i> ' + escapeHtml(d);
+                diagCont.appendChild(tag);
+            });
+        }
+
+        function renderCorrections(corrections) {
+            if (!corrections || corrections.length === 0) return;
+            const section = document.getElementById('correctionsSection');
+            const tbody = document.getElementById('correctionsTableBody');
+            const countEl = document.getElementById('correctionsCount');
+            section.style.display = 'block';
+            countEl.innerText = corrections.length;
+
+            corrections.forEach(c => {
+                const tr = document.createElement('tr');
+
+                const tdFrom = document.createElement('td');
+                tdFrom.innerHTML = '<code>' + escapeHtml(c.from || '') + '</code>';
+
+                const tdTo = document.createElement('td');
+                tdTo.innerHTML = '<code>' + escapeHtml(c.to || '') + '</code>';
+
+                const tdType = document.createElement('td');
+                const typeLabel = c.type || 'unknown';
+                const typeClass = 'correction-type-' + typeLabel.replace(/[^a-z]/g, '');
+                tdType.innerHTML = '<span class="correction-type ' + typeClass + '">' + escapeHtml(typeLabel) + '</span>';
+
+                tr.appendChild(tdFrom);
+                tr.appendChild(tdTo);
+                tr.appendChild(tdType);
+                tbody.appendChild(tr);
+            });
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
 
         function copyText() {
             const text = document.getElementById('displayText').innerText;

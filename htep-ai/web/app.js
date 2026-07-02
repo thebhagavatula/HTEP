@@ -84,8 +84,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const data = await response.json();
 
-                localStorage.setItem('extractedText', data.text);
+                // Store corrected text (falls back to ocr_text if not available)
+                const displayText = data.corrected_text || data.ocr_text || data.text || '';
+                localStorage.setItem('extractedText', displayText);
                 localStorage.setItem('fileName', file.name);
+
+                // Store full response for output page (drugs, diseases, corrections)
+                localStorage.setItem('htepResponse', JSON.stringify(data));
 
                 window.location.href = 'output.html';
 

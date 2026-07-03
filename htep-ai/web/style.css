@@ -63,7 +63,7 @@
 body {
     background-color: var(--bg-color);
     color: var(--text-color);
-    font-family: 'Verdana', Tahoma, Geneva, Open Sans, sans-serif;
+    font-family: 'Verdana', Tahoma, Geneva, Open Sansgit, sans-serif;
     display: flex;
     flex-direction: column;
     min-height: 100vh;

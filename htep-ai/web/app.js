@@ -104,33 +104,4 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    /* ===============================
-       OUTPUT PAGE LOGIC
-    =============================== */
-
-    const displayText = document.getElementById('displayText');
-
-    if (displayText) {
-
-        const text = localStorage.getItem('extractedText');
-        const fileName = localStorage.getItem('fileName');
-        const fileSub = document.getElementById('fileNameSub');
-
-        if (text) {
-            displayText.innerText = text;
-            if (fileSub) fileSub.innerText = "Source: " + (fileName || "Unknown File");
-        } else {
-            displayText.innerText = "No text found.";
-        }
-
-        const copyBtn = document.getElementById('copyBtn');
-        if (copyBtn) {
-            copyBtn.addEventListener('click', () => {
-                navigator.clipboard.writeText(displayText.innerText).then(() => {
-                    alert("Copied!");
-                });
-            });
-        }
-    }
-
 });

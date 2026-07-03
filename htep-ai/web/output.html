@@ -124,7 +124,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             // --- Theme Toggle Functionality ---
             const themeToggle = document.getElementById('theme-toggle');
-            const themeIcon = themeToggle ? themeToggle.querySelector('i') : null;
+            const themeIcon = document.getElementById('theme-icon');
 
             // Check for saved theme preference or default to light mode
             const currentTheme = localStorage.getItem('theme') || 'light';
@@ -132,7 +132,7 @@
 
             // Update icon based on current theme
             if (themeIcon) {
-                themeIcon.className = currentTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+                themeIcon.src = currentTheme === 'dark' ? 'assets/sun.svg' : 'assets/moon.svg';
             }
 
             // Toggle theme on button click
@@ -146,7 +146,7 @@
 
                     // Update icon
                     if (themeIcon) {
-                        themeIcon.className = newTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+                        themeIcon.src = newTheme === 'dark' ? 'assets/sun.svg' : 'assets/moon.svg';
                     }
                 });
             }
@@ -170,11 +170,12 @@
             if (responseRaw) {
                 try {
                     const data = JSON.parse(responseRaw);
+                    const ext = data.extracted_data || {};
                     
-                    if (data.extracted_data && Object.keys(data.extracted_data).length > 0) {
-                        renderStructuredData(data.extracted_data);
+                    if (hasUsefulData(ext)) {
+                        renderStructuredData(ext);
                     } else {
-                        // Fallback to legacy
+                        // Fallback to legacy drug/disease tags
                         renderDrugs(data.matched_drugs || []);
                         renderDiseases(data.matched_diseases || []);
                     }
@@ -189,6 +190,16 @@
             setupToggle('correctionsToggle', 'correctionsBody', 'correctionsChevron');
             setupToggle('rawTextToggle', 'rawTextBody', 'rawTextChevron');
         });
+
+        function hasUsefulData(ext) {
+            // Check if any meaningful field has actual data
+            if (ext.patient_name || ext.doctor_name || ext.hospital || ext.age || ext.gender || ext.date) return true;
+            if (ext.diagnosis && ext.diagnosis.length > 0) return true;
+            if (ext.medicines && ext.medicines.length > 0) return true;
+            if (ext.vitals && Object.keys(ext.vitals).length > 0) return true;
+            if (ext.instructions && ext.instructions.length > 0) return true;
+            return false;
+        }
 
         function setupToggle(toggleId, bodyId, chevronId) {
             const toggle = document.getElementById(toggleId);

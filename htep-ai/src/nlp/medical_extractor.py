@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 # Attempt to load spacy
 try:
     import spacy
+    spacy.load('en_core_web_trf')
     SPACY_AVAILABLE = True
 except ImportError:
     SPACY_AVAILABLE = False
@@ -36,7 +37,7 @@ class MedicalDocExtractor:
 
         if SPACY_AVAILABLE:
             # Load general NER model
-            for model_name in ["en_core_web_sm", "en_core_web_md"]:
+            for model_name in ["en_core_web_sm", "en_core_web_md", "en_core_web_trf"]:
                 try:
                     self.nlp = spacy.load(model_name)
                     logger.info("Loaded SpaCy model: %s", model_name)
@@ -85,9 +86,14 @@ class MedicalDocExtractor:
             data["patient_name"] = name_match.group(1).strip()
 
         # Doctor Name: e.g., Dr. Smith, Doctor: Jane Doe
-        doc_match = re.search(r'(?:Dr\.|Doctor|Physician)\s*[:\-]?\s*([A-Za-z\s]+?)(?=\n|,|\s+(?:Patient|Hospital|Clinic))', text, re.IGNORECASE)
+        doc_match = re.search(r'(?:Dr\.?|Doctor|Physician)\s*[:\-]?\s*([A-Za-z\.\s]+?)(?=\n|,|$|\s+(?:Patient|Hospital|Clinic|Date|Diagnosis|Rx|Age|BP))', text, re.IGNORECASE | re.MULTILINE)
         if doc_match:
-            data["doctor_name"] = ("Dr. " if not doc_match.group(1).lower().startswith("dr") else "") + doc_match.group(1).strip()
+            data["doctor_name"] = ("Dr. " if not doc_match.group(1).strip().lower().startswith("dr") else "") + doc_match.group(1).strip()
+
+        # Hospital/Clinic (Require a colon to avoid matching things like "Hospital - Summary")
+        hosp_match = re.search(r'(?:Hospital|Clinic|Medical Center|Health Center)\s*:\s*([^\n]+)', text, re.IGNORECASE)
+        if hosp_match:
+            data["hospital"] = hosp_match.group(1).strip()
 
         # Age/Gender
         age_match = re.search(r'(?:Age)\s*[:\-]\s*(\d+)', text, re.IGNORECASE)
@@ -113,10 +119,14 @@ class MedicalDocExtractor:
             data["vitals"]["pulse"] = pulse_match.group(1)
 
         # Diagnosis (Regex heuristic: looking for keywords near 'Diagnosis' or known diseases)
-        diag_match = re.search(r'(?:Diagnosis|Assessment|Impression)\s*[:\-]\s*([^\n]+)', text, re.IGNORECASE)
+        diag_match = re.search(r'(?:Diagnosis|Assessment|Impression)\s*[:\-]\s*([^\n]+(?:\n\s*[\-\*o\d\.]+\s+[^\n]+)*)', text, re.IGNORECASE)
         if diag_match:
-            items = [d.strip() for d in re.split(r',| and ', diag_match.group(1)) if d.strip()]
-            data["diagnosis"].extend(items)
+            # Split by commas or newlines with bullets
+            items = re.split(r',| and |\n', diag_match.group(1))
+            for d in items:
+                clean_d = re.sub(r'^[\-\*o\d\.]+\s*', '', d).strip()
+                if clean_d and clean_d.lower() not in ("diagnosis:", "assessment:", "impression:"):
+                    data["diagnosis"].append(clean_d)
 
         # Medicines (Regex heuristic: looking for 'Rx', 'Medication', etc.)
         rx_block = re.search(r'(?:Rx|Medications?|Medicines?|Prescription)\s*[:\-]\s*(.*?)(?:Instructions?|Advice|Plan|BP|Blood Pressure|Temp|Temperature|Pulse|HR|Vitals|$)', text, re.IGNORECASE | re.DOTALL)
@@ -141,7 +151,7 @@ class MedicalDocExtractor:
         """Parses a medication line to extract name, dosage, and frequency."""
         # Simple extraction logic based on common patterns
         dosage_match = re.search(r'(\d+(?:\.\d+)?\s*(?:mg|g|ml|mcg|units?|tablets?|capsules?|drops?))', line, re.IGNORECASE)
-        freq_match = re.search(r'\b(once|twice|thrice|daily|bid|tid|qid|prn|every \d+ hours|morning|night)\b', line, re.IGNORECASE)
+        freq_match = re.search(r'\b((?:once|twice|thrice)\s+daily|daily|bid|tid|qid|prn|every\s+\d+\s+hours|(?:once|twice|thrice)\s+a\s+day|morning\s+and\s+night|morning|night|at\s+bedtime|after\s+meals?)\b', line, re.IGNORECASE)
         
         dosage = dosage_match.group(1) if dosage_match else None
         freq = freq_match.group(1) if freq_match else None
@@ -202,8 +212,11 @@ class MedicalDocExtractor:
         try:
             doc = self.sci_nlp(text)
             for ent in doc.ents:
-                if ent.label_ == "CHEMICAL" or ent.label_ == "ENTITY":
-                    data["chemicals"].append(ent.text.strip())
+                if ent.label_ in ("CHEMICAL", "ENTITY"):
+                    # Basic filter to avoid super short acronyms or non-words
+                    clean_ent = ent.text.strip()
+                    if len(clean_ent) > 3 and clean_ent.lower() != "opd":
+                        data["chemicals"].append(clean_ent)
                 elif ent.label_ == "DISEASE":
                     data["diseases"].append(ent.text.strip())
         except Exception as e:
@@ -253,9 +266,6 @@ class MedicalDocExtractor:
 
         # 2. Merge and Deduplicate
         final_data = regex_data.copy()
-        
-        # Add original text
-        final_data["raw_text"] = text
 
         # Merge Date
         if not final_data["date"] and spacy_data["dates"]:
@@ -279,19 +289,19 @@ class MedicalDocExtractor:
         # Merge Diagnosis
         diag_set = set(d.lower() for d in final_data["diagnosis"])
         
-        # Add SciSpacy diseases
+        # Add SciSpacy diseases (with substring check to prevent duplicates)
         for disease in scispacy_data["diseases"]:
-            if disease.lower() not in diag_set:
-                final_data["diagnosis"].append(disease)
+            is_substring = any(disease.lower() in existing for existing in diag_set) or any(existing in disease.lower() for existing in diag_set)
+            if not is_substring:
+                final_data["diagnosis"].append(disease.title())
                 diag_set.add(disease.lower())
                 
         # Add Dictionary diseases (only if not already found to prevent substring matches from cluttering)
         for disease in dict_data["diseases"]:
-            # Check if this disease is a substring of an already found disease (e.g., "diabetes" vs "type 2 diabetes")
-            is_substring = any(disease in existing.lower() for existing in diag_set)
+            is_substring = any(disease.lower() in existing for existing in diag_set) or any(existing in disease.lower() for existing in diag_set)
             if not is_substring:
                 final_data["diagnosis"].append(disease.title())
-                diag_set.add(disease)
+                diag_set.add(disease.lower())
 
         # Merge Medicines
         existing_meds_lower = set(m["name"].lower() for m in final_data["medicines"])
@@ -311,15 +321,17 @@ class MedicalDocExtractor:
                 if match:
                     window = match.group(1)
                     dosage_match = re.search(r'(\d+(?:\.\d+)?\s*(?:mg|g|ml|mcg|units?|tablets?|capsules?|drops?))', window, re.IGNORECASE)
-                    freq_match = re.search(r'\b(once|twice|thrice|daily|bid|tid|qid|prn|every \d+ hours|morning|night)\b', window, re.IGNORECASE)
+                    freq_match = re.search(r'\b((?:once|twice|thrice)\s+daily|daily|bid|tid|qid|prn|every\s+\d+\s+hours|morning|night)\b', window, re.IGNORECASE)
                     if dosage_match: dosage = dosage_match.group(1)
                     if freq_match: freq = freq_match.group(1)
                 
-                final_data["medicines"].append({
-                    "name": med_name.title(),
-                    "dosage": dosage,
-                    "frequency": freq
-                })
-                existing_meds_lower.add(med_name.lower())
+                # Only add if it has a dosage, OR if it's explicitly in our drug dictionary
+                if dosage or (med_name.lower() in self.drugs):
+                    final_data["medicines"].append({
+                        "name": med_name.title(),
+                        "dosage": dosage,
+                        "frequency": freq
+                    })
+                    existing_meds_lower.add(med_name.lower())
 
         return final_data

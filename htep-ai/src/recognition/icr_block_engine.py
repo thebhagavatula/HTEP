@@ -58,7 +58,7 @@ class BlockICREngine:
         else:
             try:
                 self.model = load_model(model_path)
-                print(f"✅ Model loaded successfully from {model_path}")
+                print(f"[OK] Model loaded successfully from {model_path}")
             except Exception as e:
                 print(f"Error loading model: {e}")
                 self.model = None
@@ -82,7 +82,7 @@ class BlockICREngine:
         self.img_width = self.metadata["img_width"]
         self.img_height = self.metadata["img_height"]
 
-        print("✅ BlockICREngine loaded successfully")
+        print("[OK] BlockICREngine loaded successfully")
         print(f"   Classes: {len(self.metadata['classes'])}")
 
     # --------------------------------------------------

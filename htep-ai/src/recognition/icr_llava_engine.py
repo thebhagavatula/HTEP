@@ -33,7 +33,7 @@ class LlavaICREngine:
             "Keep original line breaks when visible. "
             "Return only plain transcribed text, no labels and no markdown."
         )
-        print(f"✅ LlavaICREngine initialized (Using Ollama tag: {self.model_name})")
+        print(f"[OK] LlavaICREngine initialized (Using Ollama tag: {self.model_name})")
 
     def _preprocess(self, img):
         """

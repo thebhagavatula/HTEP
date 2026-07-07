@@ -1,0 +1,248 @@
+[
+  {
+    "image_path": "data/raw/test3.png",
+    "type": "printed",
+    "raw_text": "CityCare Hospital - Discharge Summary\nPatient Name : Vikas Reddy\nPatient ID : CH-3021\nAge\n:45\nGender\n: Male\nAdmission Date: 02/08/2025\nDischarge Date: 07/08/2025\nDiagnosis:\n- Type 2 Diabetes Mellitus (controlled)\n- Mild Hypertension\nTreatment Summary:\n- Metformin 500mg twice daily\n- Amlodipine 5mg once daily\n- Low-sodium diabetic diet\n- Daily BP and sugar monitoring\nFollow up instructions:\n- Visit endocrinology OPD after 15 days.\n- Continue medications, avoid high-sugar foods.\nConsultant: Dr. Sanjay Kapoor\nSignature:",
+    "extracted_data": {
+      "patient_name": "Vikas Reddy",
+      "age": "45",
+      "gender": "Male",
+      "date": "02/08/2025",
+      "doctor_name": "Dr. Sanjay Kapoor",
+      "hospital": "CityCare Hospital",
+      "diagnosis": [
+        "Type 2 Diabetes Mellitus (controlled)",
+        "Mild Hypertension"
+      ],
+      "medicines": [
+        {
+          "name": "Metformin",
+          "dosage": "500mg",
+          "frequency": "twice daily"
+        },
+        {
+          "name": "Amlodipine",
+          "dosage": "5mg",
+          "frequency": "once daily"
+        }
+      ],
+      "vitals": {},
+      "instructions": [
+        "- Visit endocrinology OPD after 15 days.",
+        "- Continue medications, avoid high-sugar foods.",
+        "Consultant: Dr. Sanjay Kapoor",
+        "Signature:"
+      ]
+    }
+  },
+  {
+    "image_path": "data/raw/test.jpeg",
+    "type": "handwritten",
+    "raw_text": "Paracetamol\nParacetmol\nParcetmal",
+    "extracted_data": {
+      "patient_name": null,
+      "age": null,
+      "gender": null,
+      "date": null,
+      "doctor_name": null,
+      "hospital": null,
+      "diagnosis": [],
+      "medicines": [
+        {
+          "name": "Paracetamol",
+          "dosage": null,
+          "frequency": null
+        }
+      ],
+      "vitals": {},
+      "instructions": []
+    }
+  },
+  {
+    "image_path": "data/raw/synthetic_1.png",
+    "type": "printed",
+    "raw_text": "Sunrise Clinic - Discharge Summary\nPatient Name : Sarah Garcia\nPatient ID : CH-4338\nAge : 80\nGender : Female\nDate : 24/09/2025\nDiagnosis:\n- cardiomyopathy\n- measles\nTreatment Summary:\n- Budesonide 10mg twice daily\n- Indapamide 5mg before sleep\n- Clindamycin 50mg before sleep\nFollow up instructions:\n- Continue medications as prescribed.\n- Avoid high-sugar foods.\nSignature:\nConsultant: Dr. Lee",
+    "extracted_data": {
+      "patient_name": "Sarah Garcia",
+      "age": "80",
+      "gender": "Female",
+      "date": "24/09/2025",
+      "doctor_name": "Dr. Lee",
+      "hospital": "Sunrise Clinic",
+      "diagnosis": [
+        "cardiomyopathy",
+        "measles"
+      ],
+      "medicines": [
+        {
+          "name": "Budesonide",
+          "dosage": "10mg",
+          "frequency": "twice daily"
+        },
+        {
+          "name": "Indapamide",
+          "dosage": "5mg",
+          "frequency": "before sleep"
+        },
+        {
+          "name": "Clindamycin",
+          "dosage": "50mg",
+          "frequency": "before sleep"
+        }
+      ],
+      "vitals": {},
+      "instructions": [
+        "- Continue medications as prescribed.",
+        "- Avoid high-sugar foods.",
+        "Signature:",
+        "Consultant: Dr. Lee"
+      ]
+    }
+  },
+  {
+    "image_path": "data/raw/synthetic_2.png",
+    "type": "printed",
+    "raw_text": "Sunrise Clinic - Discharge Summary\nPatient Name : Robert Miller\nPatient ID : CH-2830\nAge : 56\nGender : Male\nDate : 12/03/2025\nDiagnosis:\n- leukemia\n- sinusitis\nTreatment Summary:\n- Doxycycline 500mg before sleep\nFollow up instructions:\n- Schedule a follow-up in 2 weeks.\n- Continue medications as prescribed.\nSignature:\nConsultant: Dr. Adams",
+    "extracted_data": {
+      "patient_name": "Robert Miller",
+      "age": "56",
+      "gender": "Male",
+      "date": "12/03/2025",
+      "doctor_name": "Dr. Adams",
+      "hospital": "Sunrise Clinic",
+      "diagnosis": [
+        "leukemia",
+        "sinusitis"
+      ],
+      "medicines": [
+        {
+          "name": "Doxycycline",
+          "dosage": "500mg",
+          "frequency": "before sleep"
+        }
+      ],
+      "vitals": {},
+      "instructions": [
+        "- Schedule a follow-up in 2 weeks.",
+        "- Continue medications as prescribed.",
+        "Signature:",
+        "Consultant: Dr. Adams"
+      ]
+    }
+  },
+  {
+    "image_path": "data/raw/synthetic_3.png",
+    "type": "printed",
+    "raw_text": "Sunrise Clinic - Discharge Summary\nPatient Name : Laura Brown\nPatient ID : CH-3263\nAge : 48\nGender : Female\nDate : 06/12/2025\nDiagnosis:\n- sickle cell disease\nTreatment Summary:\n- Clonazepam 5mg every 8 hours\n- Hydrocodone 100mg twice daily\nFollow up instructions:\n- Return to clinic if symptoms worsen.\n- Continue medications as prescribed.\nSignature:\nConsultant: Dr. Kapoor",
+    "extracted_data": {
+      "patient_name": "Laura Brown",
+      "age": "48",
+      "gender": "Female",
+      "date": "06/12/2025",
+      "doctor_name": "Dr. Kapoor",
+      "hospital": "Sunrise Clinic",
+      "diagnosis": [
+        "sickle cell disease"
+      ],
+      "medicines": [
+        {
+          "name": "Clonazepam",
+          "dosage": "5mg",
+          "frequency": "every 8 hours"
+        },
+        {
+          "name": "Hydrocodone",
+          "dosage": "100mg",
+          "frequency": "twice daily"
+        }
+      ],
+      "vitals": {},
+      "instructions": [
+        "- Return to clinic if symptoms worsen.",
+        "- Continue medications as prescribed.",
+        "Signature:",
+        "Consultant: Dr. Kapoor"
+      ]
+    }
+  },
+  {
+    "image_path": "data/raw/synthetic_4.png",
+    "type": "printed",
+    "raw_text": "Sunrise Clinic - Discharge Summary\nPatient Name : Jane Davis\nPatient ID : CH-7240\nAge : 21\nGender : Female\nDate : 09/04/2025\nDiagnosis:\n- type 2 diabetes\nTreatment Summary:\n- Bupropion 10mg twice daily\n- Ondansetron 50mg thrice daily\n- Lamotrigine 250mg thrice daily\nFollow up instructions:\n- Schedule a follow-up in 2 weeks.\n- Continue medications as prescribed.\nSignature:\nConsultant: Dr. Lee",
+    "extracted_data": {
+      "patient_name": "Jane Davis",
+      "age": "21",
+      "gender": "Female",
+      "date": "09/04/2025",
+      "doctor_name": "Dr. Lee",
+      "hospital": "Sunrise Clinic",
+      "diagnosis": [
+        "type 2 diabetes"
+      ],
+      "medicines": [
+        {
+          "name": "Bupropion",
+          "dosage": "10mg",
+          "frequency": "twice daily"
+        },
+        {
+          "name": "Ondansetron",
+          "dosage": "50mg",
+          "frequency": "thrice daily"
+        },
+        {
+          "name": "Lamotrigine",
+          "dosage": "250mg",
+          "frequency": "thrice daily"
+        }
+      ],
+      "vitals": {},
+      "instructions": [
+        "- Schedule a follow-up in 2 weeks.",
+        "- Continue medications as prescribed.",
+        "Signature:",
+        "Consultant: Dr. Lee"
+      ]
+    }
+  },
+  {
+    "image_path": "data/raw/synthetic_5.png",
+    "type": "printed",
+    "raw_text": "Sunrise Clinic - Discharge Summary\nPatient Name : Jane Williams\nPatient ID : CH-5243\nAge : 21\nGender : Female\nDate : 20/11/2025\nDiagnosis:\n- raynaud disease\nTreatment Summary:\n- Lisinopril 500mg before sleep\n- Imipenem 250mg twice daily\n- Atropine 100mg before sleep\nFollow up instructions:\n- Schedule a follow-up in 2 weeks.\n- Avoid high-sugar foods.\nSignature:\nConsultant: Dr. Smith",
+    "extracted_data": {
+      "patient_name": "Jane Williams",
+      "age": "21",
+      "gender": "Female",
+      "date": "20/11/2025",
+      "doctor_name": "Dr. Smith",
+      "hospital": "Sunrise Clinic",
+      "diagnosis": [
+        "raynaud disease"
+      ],
+      "medicines": [
+        {
+          "name": "Lisinopril",
+          "dosage": "500mg",
+          "frequency": "before sleep"
+        },
+        {
+          "name": "Imipenem",
+          "dosage": "250mg",
+          "frequency": "twice daily"
+        },
+        {
+          "name": "Atropine",
+          "dosage": "100mg",
+          "frequency": "before sleep"
+        }
+      ],
+      "vitals": {},
+      "instructions": [
+        "- Schedule a follow-up in 2 weeks.",
+        "- Avoid high-sugar foods.",
+        "Signature:",
+        "Consultant: Dr. Smith"
+      ]
+    }
+  }
+]

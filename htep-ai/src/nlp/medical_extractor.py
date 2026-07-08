@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 # Attempt to load spacy
 try:
     import spacy
-    spacy.load('en_core_web_trf')
     SPACY_AVAILABLE = True
 except ImportError:
     SPACY_AVAILABLE = False

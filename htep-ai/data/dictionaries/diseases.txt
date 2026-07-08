@@ -1,0 +1,242 @@
+acne
+acute kidney injury
+acute respiratory distress syndrome
+addison disease
+adhd
+allergic rhinitis
+alzheimer disease
+anemia
+angina
+ankylosing spondylitis
+anxiety
+aortic stenosis
+appendicitis
+arrhythmia
+arthritis
+asthma
+atrial fibrillation
+autism
+benign prostatic hyperplasia
+bipolar disorder
+bladder cancer
+bone fracture
+breast cancer
+bronchitis
+bursitis
+cancer
+cardiomyopathy
+carpal tunnel syndrome
+cataracts
+celiac disease
+cellulitis
+cerebral palsy
+cervical cancer
+chickenpox
+cholecystitis
+cholesterol
+chronic fatigue syndrome
+chronic kidney disease
+chronic obstructive pulmonary disease
+cirrhosis
+colon cancer
+colorectal cancer
+congestive heart failure
+conjunctivitis
+constipation
+copd
+coronary artery disease
+crohn disease
+cushing syndrome
+cystic fibrosis
+deep vein thrombosis
+dementia
+dengue
+depression
+dermatitis
+diabetes
+diabetes mellitus
+diabetic neuropathy
+diarrhea
+diverticulitis
+down syndrome
+drug allergy
+dry eye syndrome
+dyslipidemia
+eczema
+edema
+emphysema
+encephalitis
+endometriosis
+epilepsy
+erectile dysfunction
+esophageal cancer
+fatty liver disease
+fever
+fibromyalgia
+food allergy
+fracture
+gallstones
+gastric ulcer
+gastritis
+gastroenteritis
+gastroesophageal reflux disease
+gerd
+glaucoma
+gout
+graves disease
+guillain barre syndrome
+hashimoto thyroiditis
+hay fever
+headache
+hearing loss
+heart attack
+heart failure
+hemophilia
+hemorrhoids
+hepatitis
+hepatitis a
+hepatitis b
+hepatitis c
+hernia
+herpes
+hiv
+hodgkin lymphoma
+huntington disease
+hypercalcemia
+hyperglycemia
+hyperlipidemia
+hypertension
+hyperthyroidism
+hypoglycemia
+hyponatremia
+hypothyroidism
+impetigo
+infection
+infectious mononucleosis
+infertility
+influenza
+insomnia
+interstitial lung disease
+iron deficiency anemia
+irritable bowel syndrome
+jaundice
+kidney cancer
+kidney stones
+laryngitis
+leukemia
+liver cancer
+lung cancer
+lupus
+lyme disease
+lymphoma
+macular degeneration
+malaria
+measles
+melanoma
+meningitis
+menopause
+metabolic syndrome
+migraine
+miscarriage
+multiple myeloma
+multiple sclerosis
+mumps
+muscular dystrophy
+myasthenia gravis
+myocardial infarction
+narcolepsy
+nausea
+nephritis
+neuropathy
+non hodgkin lymphoma
+obesity
+obsessive compulsive disorder
+oral cancer
+osteoarthritis
+osteomyelitis
+osteoporosis
+otitis media
+ovarian cancer
+paget disease
+pancreatitis
+pancreatic cancer
+panic disorder
+parkinson disease
+pelvic inflammatory disease
+peptic ulcer
+pericarditis
+peripheral artery disease
+peripheral neuropathy
+peritonitis
+pharyngitis
+pheochromocytoma
+pleurisy
+pneumonia
+pneumothorax
+polycystic kidney disease
+polycystic ovary syndrome
+polymyalgia rheumatica
+post traumatic stress disorder
+preeclampsia
+prostate cancer
+prostatitis
+psoriasis
+psoriatic arthritis
+ptsd
+pulmonary embolism
+pulmonary fibrosis
+pyelonephritis
+rabies
+raynaud disease
+renal failure
+restless leg syndrome
+retinal detachment
+rheumatoid arthritis
+rickets
+rosacea
+rotavirus
+rubella
+sarcoidosis
+scabies
+schizophrenia
+sciatica
+scoliosis
+seizure
+sepsis
+septic shock
+shingles
+sickle cell disease
+sinusitis
+skin cancer
+sleep apnea
+spinal stenosis
+stomach cancer
+stroke
+substance abuse
+systemic lupus erythematosus
+tachycardia
+tendinitis
+testicular cancer
+tetanus
+thalassemia
+thrombocytopenia
+thyroid cancer
+tinnitus
+tonsillitis
+tuberculosis
+tumor
+type 1 diabetes
+type 2 diabetes
+ulcerative colitis
+urinary incontinence
+urinary tract infection
+uterine cancer
+uveitis
+varicella
+varicose veins
+vasculitis
+vertigo
+viral hepatitis
+vitamin d deficiency
+vitiligo
+whooping cough

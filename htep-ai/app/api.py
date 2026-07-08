@@ -4,6 +4,7 @@ from pathlib import Path
 import sys
 import time
 from flask import Flask, request, jsonify, send_from_directory
+from flask_cors import CORS
 from werkzeug.utils import secure_filename
 import traceback
 import cv2
@@ -35,6 +36,7 @@ from src.nlp.block_parser import BlockTextParser
 from src.recognition.icr_llava_engine import LlavaICREngine
 from src.nlp.ocr_postprocessor import OCRPostProcessor
 from src.nlp.medical_extractor import MedicalDocExtractor
+from src.nlp.classifier import MedicalDocumentClassifier
 
 # -------------------------------
 # FLASK APP
@@ -45,6 +47,7 @@ app = Flask(
     static_folder=str(WEB_DIR),
     static_url_path=""
 )
+CORS(app)
 
 # -------------------------------
 # LOAD MODELS ONCE
@@ -76,6 +79,10 @@ if ocr_postprocessor:
         print("[OK] MedicalDocExtractor loaded")
     except Exception as e:
         print(f"MedicalDocExtractor disabled: {e}")
+
+# Document classifier (adds document type badge + urgency)
+doc_classifier = MedicalDocumentClassifier()
+print("[OK] MedicalDocumentClassifier loaded")
 
 print("Backend ready")
 
@@ -120,6 +127,7 @@ def upload_file():
 
         print(f"File received: {filename}")
         request_start = time.time()
+        timings = {}
 
         suffix = file_path.suffix.lower()
 
@@ -130,7 +138,9 @@ def upload_file():
             ocr_text = "\n".join(pages.values())
         else:
             ocr_text = ocr_engine.extract_from_image(str(file_path))
-        print(f"OCR completed in {time.time() - t0:.2f}s")
+        ocr_time = round(time.time() - t0, 2)
+        timings["ocr"] = ocr_time
+        print(f"OCR completed in {ocr_time}s")
 
         # ---------------- BLOCK ICR (IMAGES ONLY) ----------------
         block_text = ""
@@ -149,7 +159,9 @@ def upload_file():
                 # Fallback to sentence if single-line
                 if "\n" not in block_text:
                     block_text = block_icr.predict_sentence(image)
-                print(f"Block ICR completed in {time.time() - t0:.2f}s")
+                icr_time = round(time.time() - t0, 2)
+                timings["block_icr"] = icr_time
+                print(f"Block ICR completed in {icr_time}s")
 
                 block_text_raw = block_text
 
@@ -159,7 +171,9 @@ def upload_file():
                         t0 = time.time()
                         block_parse_result = block_parser.parse(block_text)
                         block_text = block_parse_result.get("corrected_text", block_text)
-                        print(f"Block parser completed in {time.time() - t0:.2f}s")
+                        parser_time = round(time.time() - t0, 2)
+                        timings["block_parser"] = parser_time
+                        print(f"Block parser completed in {parser_time}s")
                     except Exception as e:
                         print("Block parser failed:", e)
 
@@ -170,7 +184,9 @@ def upload_file():
                         llava_result = llava_icr.predict_paragraph(image)
                         llava_text = llava_result.get("text", "")
                         llava_conf = llava_result.get("confidence", 0.0)
-                        print(f"LLaVA ICR completed in {time.time() - t0:.2f}s")
+                        llava_time = round(time.time() - t0, 2)
+                        timings["llava_icr"] = llava_time
+                        print(f"LLaVA ICR completed in {llava_time}s")
                     except Exception as e:
                         print("LLaVa ICR failed:", e)
                         llava_text = ""
@@ -192,7 +208,9 @@ def upload_file():
                 matched_drugs = post_result.get("matched_drugs", [])
                 matched_diseases = post_result.get("matched_diseases", [])
                 post_corrections = post_result.get("corrections", [])
-                print(f"Post-processing completed in {time.time() - t0:.2f}s")
+                postproc_time = round(time.time() - t0, 2)
+                timings["post_processing"] = postproc_time
+                print(f"Post-processing completed in {postproc_time}s")
                 print(f"  Drugs matched: {matched_drugs}")
                 print(f"  Diseases matched: {matched_diseases}")
                 print(f"  Corrections applied: {len(post_corrections)}")
@@ -206,7 +224,9 @@ def upload_file():
             try:
                 t0 = time.time()
                 extracted_data = medical_extractor.extract(final_text)
-                print(f"JSON extraction completed in {time.time() - t0:.2f}s")
+                extraction_time = round(time.time() - t0, 2)
+                timings["json_extraction"] = extraction_time
+                print(f"JSON extraction completed in {extraction_time}s")
             except Exception as e:
                 print(f"JSON extraction failed: {e}")
 
@@ -215,7 +235,24 @@ def upload_file():
         print(f"BLOCK len={len(block_text)} preview={_preview(block_text)!r}")
         print(f"LLAVA len={len(llava_text)} preview={_preview(llava_text)!r}")
         print(f"FINAL len={len(final_text)} preview={_preview(final_text)!r}")
-        print(f"Total request time: {time.time() - request_start:.2f}s")
+        total_time = round(time.time() - request_start, 2)
+        timings["total"] = total_time
+        print(f"Total request time: {total_time}s")
+
+        # ---------------- DOCUMENT CLASSIFICATION ----------------
+        classification = {}
+        try:
+            class_result = doc_classifier.classify_document(final_text)
+            urgency_level, urgency_conf = doc_classifier.get_document_urgency(final_text)
+            classification = {
+                "document_type": class_result.document_type,
+                "confidence": round(class_result.confidence, 2),
+                "urgency": urgency_level,
+                "urgency_confidence": round(urgency_conf, 2),
+                "keywords_found": class_result.keywords_found[:10],
+            }
+        except Exception as e:
+            print(f"Classification failed: {e}")
 
         response = {
             "text": final_text,
@@ -226,6 +263,8 @@ def upload_file():
             "matched_diseases": matched_diseases,
             "corrections": post_corrections,
             "extracted_data": extracted_data,
+            "classification": classification,
+            "timings": timings,
         }
 
         if block_text_raw.strip() and block_parse_result is not None:

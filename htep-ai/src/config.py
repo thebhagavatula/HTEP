@@ -31,7 +31,7 @@ DISEASE_FUZZY_THRESHOLD = int(os.getenv("HTEP_DISEASE_FUZZY_THRESHOLD", "85"))
 OCR_ENGINE = "paddle"  # switch to "tesseract" anytime to roll back instantly
 
 # Tesseract Configuration
-TESSERACT_CMD_PATH = os.getenv("TESSERACT_CMD_PATH", r"C:\Program Files\Tesseract-OCR\tesseract.exe")
+TESSERACT_CMD_PATH = os.getenv("TESSERACT_CMD_PATH", "tesseract")
 
 # Model configurations
 LLAVA_MODEL_TAG = os.getenv("LLAVA_MODEL_TAG", "llava")

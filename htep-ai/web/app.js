@@ -75,7 +75,12 @@ document.addEventListener('DOMContentLoaded', () => {
             formData.append('file', file);
 
             try {
-                const response = await fetch('http://127.0.0.1:5000/upload', {
+                // Dynamic API URL: uses localhost for dev, deployed backend URL for production
+                const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                    ? 'http://127.0.0.1:5000'
+                    : (window.HTEP_API_BASE || 'https://htep-backend.onrender.com');
+                
+                const response = await fetch(API_BASE + '/upload', {
                     method: 'POST',
                     body: formData
                 });

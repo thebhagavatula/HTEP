@@ -1,0 +1,57 @@
+# ============================================
+# HTEP-AI Production Dependencies
+# ============================================
+# Use this file for deployment (Dockerfile / cloud platform)
+# Excludes dev tools: jupyter, matplotlib, pytest, etc.
+
+# Core OCR and Image Processing
+opencv-python-headless==4.10.0.84
+pdf2image==1.17.0
+Pillow==10.4.0
+
+# PaddleOCR (primary OCR engine)
+paddleocr>=3.7.0
+paddlepaddle>=3.3.0
+
+# Tesseract (backup OCR engine)
+pytesseract==0.3.13
+
+# API server
+Flask==3.1.1
+Flask-Cors==5.0.0
+gunicorn>=22.0.0
+
+# Data Processing
+pandas>=2.2.0,<2.3.0
+numpy>=1.26.4,<2.1
+
+# Machine Learning (ICR Training)
+scikit-learn==1.5.2
+
+# Deep Learning (CNN-based ICR)
+tensorflow>=2.18.0,<2.19.0; python_version < "3.13"
+
+# Text Processing
+nltk==3.9.1
+rapidfuzz>=3.0.0
+
+# NLP parsing for block handwriting normalization
+spacy==3.7.5
+
+# Progress bars and utilities
+tqdm==4.67.1
+
+# Logging and configuration
+python-dotenv==1.0.1
+
+# Data validation
+pydantic==2.10.3
+
+# Character encoding detection
+chardet==5.2.0
+
+# JSON validation
+jsonschema==4.23.0
+
+# LLaVa Integration (optional — gracefully disabled if Ollama unavailable)
+ollama==0.4.5

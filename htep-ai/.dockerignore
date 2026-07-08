@@ -1,0 +1,42 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment / secrets
+.env
+.env.*
+
+# Version control and IDE
+.git/
+.gitignore
+.idea/
+.vscode/
+*.iml
+
+# User-uploaded data (created at runtime)
+data/raw/*
+data/processed/*
+data/fonts/
+
+# Tests and scripts (not needed in production)
+tests/
+scripts/
+
+# Development-only files
+*.log
+*.tmp
+.pytest_cache/
+*.egg-info/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation
+README.md
+*.md
+
+# Jupyter
+*.ipynb
+.ipynb_checkpoints/

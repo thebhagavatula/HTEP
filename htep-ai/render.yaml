@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: htep-backend
+    env: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /
+    envVars:
+      - key: OCR_ENGINE
+        value: paddle
+      - key: FLASK_ENV
+        value: production
+      - key: TESSERACT_CMD_PATH
+        value: tesseract

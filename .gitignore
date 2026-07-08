@@ -42,6 +42,10 @@ htep-ai/data/**
 !htep-ai/data/processed/.gitkeep
 !htep-ai/data/icr_training/.gitkeep
 
+# Keep dictionary files (required at runtime for drug/disease matching)
+!htep-ai/data/dictionaries/
+!htep-ai/data/dictionaries/**
+
 # ---------------------------
 # Images & documents (global)
 # ---------------------------

@@ -74,18 +74,41 @@ document.addEventListener('DOMContentLoaded', () => {
             const formData = new FormData();
             formData.append('file', file);
 
+            let timeoutId, ticker;
+
             try {
                 // Dynamic API URL: uses localhost for dev, deployed backend URL for production
                 const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
                     ? 'http://127.0.0.1:5000'
                     : (window.HTEP_API_BASE || 'https://healthcare-text-extraction-platform.onrender.com');
 
+                // Abort controller with 5-minute timeout for slow free-tier processing
+                const controller = new AbortController();
+                timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000);
+
+                // Show elapsed time while processing
+                let elapsed = 0;
+                ticker = setInterval(() => {
+                    elapsed++;
+                    if (status) status.innerText = `Processing... (${elapsed}s)`;
+                }, 1000);
+
                 const response = await fetch(API_BASE + '/upload', {
                     method: 'POST',
-                    body: formData
+                    body: formData,
+                    signal: controller.signal
                 });
+                clearTimeout(timeoutId);
+                clearInterval(ticker);
 
-                if (!response.ok) throw new Error("Server error");
+                if (!response.ok) {
+                    let serverMsg = "Server error (" + response.status + ")";
+                    try {
+                        const errBody = await response.json();
+                        if (errBody.error) serverMsg = errBody.error;
+                    } catch (_) {}
+                    throw new Error(serverMsg);
+                }
 
                 const data = await response.json();
 
@@ -100,8 +123,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 window.location.href = 'output.html';
 
             } catch (error) {
+                clearTimeout(timeoutId);
+                clearInterval(ticker);
                 console.error(error);
-                if (status) status.innerText = "Error processing file.";
+                let errorMsg = "Error processing file.";
+                if (error.name === 'AbortError') {
+                    errorMsg = "Request timed out — the server took too long. Try a smaller image or try again later.";
+                } else if (error.message) {
+                    errorMsg = "Error: " + error.message;
+                }
+                if (status) status.innerText = errorMsg;
                 extractBtn.disabled = false;
                 extractBtn.innerText = "Start Extraction";
                 if (loader) loader.style.display = "none";

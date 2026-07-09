@@ -23,4 +23,4 @@ RUN mkdir -p data/raw data/processed data/dictionaries
 EXPOSE 5000
 
 # Use PORT env var (Render sets this dynamically), fallback to 5000 for local Docker
-CMD gunicorn --bind 0.0.0.0:${PORT:-5000} --timeout 120 --workers 1 --threads 2 app.api:app
+CMD gunicorn --bind 0.0.0.0:${PORT:-5000} --timeout 300 --workers 1 --threads 2 app.api:app

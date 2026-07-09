@@ -7,6 +7,7 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 import traceback
+import sys
 import cv2
 
 # -------------------------------
@@ -85,10 +86,27 @@ doc_classifier = MedicalDocumentClassifier()
 print("[OK] MedicalDocumentClassifier loaded")
 
 print("Backend ready")
+sys.stdout.flush()
 
 # -------------------------------
 # WEBSITE ROUTES
 # -------------------------------
+
+@app.route("/status")
+def status():
+    """Health-check endpoint — shows what's loaded."""
+    import psutil
+    proc = psutil.Process()
+    mem = proc.memory_info()
+    return jsonify({
+        "status": "ok",
+        "ocr_engine": ocr_engine.engine_name,
+        "block_icr": block_icr.model is not None if hasattr(block_icr, 'model') else False,
+        "ocr_postprocessor": ocr_postprocessor is not None,
+        "medical_extractor": medical_extractor is not None,
+        "llava_icr": llava_icr is not None,
+        "memory_mb": round(mem.rss / 1024 / 1024, 1),
+    })
 
 @app.route("/")
 def index():
@@ -125,7 +143,7 @@ def upload_file():
         file_path = UPLOAD_DIR / filename
         file.save(file_path)
 
-        print(f"File received: {filename}")
+        print(f"File received: {filename}", flush=True)
         request_start = time.time()
         timings = {}
 
@@ -140,7 +158,7 @@ def upload_file():
             ocr_text = ocr_engine.extract_from_image(str(file_path))
         ocr_time = round(time.time() - t0, 2)
         timings["ocr"] = ocr_time
-        print(f"OCR completed in {ocr_time}s")
+        print(f"OCR completed in {ocr_time}s", flush=True)
 
         # ---------------- BLOCK ICR (IMAGES ONLY) ----------------
         block_text = ""
@@ -161,7 +179,7 @@ def upload_file():
                     block_text = block_icr.predict_sentence(image)
                 icr_time = round(time.time() - t0, 2)
                 timings["block_icr"] = icr_time
-                print(f"Block ICR completed in {icr_time}s")
+                print(f"Block ICR completed in {icr_time}s", flush=True)
 
                 block_text_raw = block_text
 
@@ -283,8 +301,10 @@ def upload_file():
         return jsonify(response)
 
     except Exception as e:
-        print("ERROR DURING PROCESSING")
+        print("ERROR DURING PROCESSING", flush=True)
         traceback.print_exc()
+        sys.stdout.flush()
+        sys.stderr.flush()
         return jsonify({"error": str(e)}), 500
 
 # -------------------------------

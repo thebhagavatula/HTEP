@@ -44,6 +44,9 @@ tqdm==4.67.1
 # Logging and configuration
 python-dotenv==1.0.1
 
+# Process monitoring (for /status endpoint)
+psutil>=5.9.0
+
 # Data validation
 pydantic==2.10.3
 

@@ -51,42 +51,59 @@ app = Flask(
 CORS(app)
 
 # -------------------------------
-# LOAD MODELS ONCE
+# LAZY LOAD MODELS
 # -------------------------------
+# Loading ML models at the module level blocks gunicorn from binding to the port
+# on Cloud Run, causing startup timeouts. We lazy-load them instead.
 
-ocr_engine = OCRExtractor()
-block_icr = BlockICREngine()
-block_parser = BlockTextParser()
-
+engines_loaded = False
+ocr_engine = None
+block_icr = None
+block_parser = None
 llava_icr = None
-
-try:
-    llava_icr = LlavaICREngine()       # LLaVa Integration
-except Exception as e:
-    print(f"LlavaICREngine disabled: {e}")
-
-# OCR Post-Processor (drug/disease dictionaries + fuzzy matching)
 ocr_postprocessor = None
-try:
-    ocr_postprocessor = OCRPostProcessor()
-    print("[OK] OCRPostProcessor loaded")
-except Exception as e:
-    print(f"OCRPostProcessor disabled: {e}")
-
 medical_extractor = None
-if ocr_postprocessor:
+doc_classifier = None
+
+def load_engines():
+    global engines_loaded, ocr_engine, block_icr, block_parser, llava_icr
+    global ocr_postprocessor, medical_extractor, doc_classifier
+    
+    if engines_loaded:
+        return
+
+    print("Initializing ML engines...", flush=True)
+    t0 = time.time()
+    
+    ocr_engine = OCRExtractor()
+    block_icr = BlockICREngine()
+    block_parser = BlockTextParser()
+
     try:
-        medical_extractor = MedicalDocExtractor(ocr_postprocessor.drugs, ocr_postprocessor.diseases)
-        print("[OK] MedicalDocExtractor loaded")
+        llava_icr = LlavaICREngine()       # LLaVa Integration
     except Exception as e:
-        print(f"MedicalDocExtractor disabled: {e}")
+        print(f"LlavaICREngine disabled: {e}", flush=True)
 
-# Document classifier (adds document type badge + urgency)
-doc_classifier = MedicalDocumentClassifier()
-print("[OK] MedicalDocumentClassifier loaded")
+    try:
+        ocr_postprocessor = OCRPostProcessor()
+        print("[OK] OCRPostProcessor loaded", flush=True)
+    except Exception as e:
+        print(f"OCRPostProcessor disabled: {e}", flush=True)
 
-print("Backend ready")
-sys.stdout.flush()
+    if ocr_postprocessor:
+        try:
+            medical_extractor = MedicalDocExtractor(ocr_postprocessor.drugs, ocr_postprocessor.diseases)
+            print("[OK] MedicalDocExtractor loaded", flush=True)
+        except Exception as e:
+            print(f"MedicalDocExtractor disabled: {e}", flush=True)
+
+    doc_classifier = MedicalDocumentClassifier()
+    print("[OK] MedicalDocumentClassifier loaded", flush=True)
+    
+    engines_loaded = True
+    print(f"All engines initialized in {round(time.time() - t0, 2)}s", flush=True)
+
+print("Backend ready", flush=True)
 
 # -------------------------------
 # WEBSITE ROUTES
@@ -95,13 +112,14 @@ sys.stdout.flush()
 @app.route("/status")
 def status():
     """Health-check endpoint — shows what's loaded."""
+    load_engines()
     import psutil
     proc = psutil.Process()
     mem = proc.memory_info()
     return jsonify({
         "status": "ok",
-        "ocr_engine": ocr_engine.engine_name,
-        "block_icr": block_icr.model is not None if hasattr(block_icr, 'model') else False,
+        "ocr_engine": ocr_engine.engine_name if ocr_engine else None,
+        "block_icr": block_icr.model is not None if (block_icr and hasattr(block_icr, 'model')) else False,
         "ocr_postprocessor": ocr_postprocessor is not None,
         "medical_extractor": medical_extractor is not None,
         "llava_icr": llava_icr is not None,
@@ -132,6 +150,8 @@ def _preview(text: str, limit: int = 180) -> str:
 @app.route("/upload", methods=["POST"])
 def upload_file():
     try:
+        load_engines()
+        
         if "file" not in request.files:
             return jsonify({"error": "No file uploaded"}), 400
 

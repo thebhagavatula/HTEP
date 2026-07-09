@@ -31,7 +31,8 @@ COPY --chown=user . .
 RUN mkdir -p data/raw data/processed data/dictionaries
 
 # Cloud Run injects the PORT environment variable (default 8080)
-EXPOSE 8080
+# Make Python logs unbuffered so they show up immediately in Cloud Logging
+ENV PYTHONUNBUFFERED True
 
-# Bind to 0.0.0.0:$PORT
-CMD gunicorn --bind 0.0.0.0:${PORT:-8080} --timeout 300 --workers 1 --threads 2 app.api:app
+# Run gunicorn using exec, bind directly to $PORT, and disable gunicorn's internal timeout (Cloud Run handles timeouts)
+CMD exec gunicorn --bind :$PORT --workers 1 --threads 2 --timeout 0 app.api:app

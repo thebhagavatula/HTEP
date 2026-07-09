@@ -20,6 +20,10 @@ RUN pip install --no-cache-dir -r requirements-deploy.txt
 # Download spaCy model at build time
 RUN python -m spacy download en_core_web_sm
 
+# Pre-download PaddleOCR models at build time so the container starts instantly
+# (Without this, Cloud Run will timeout while downloading them on every cold start)
+RUN python -c "from paddleocr import PaddleOCR; PaddleOCR(lang='en', use_doc_orientation_classify=False, use_doc_unwarping=False, use_textline_orientation=False)"
+
 # Copy project files
 COPY --chown=user . .
 

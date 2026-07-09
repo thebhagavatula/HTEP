@@ -26,8 +26,8 @@ COPY --chown=user . .
 # Ensure data directories exist
 RUN mkdir -p data/raw data/processed data/dictionaries
 
-# Hugging Face Spaces uses port 7860 by default
-EXPOSE 7860
+# Cloud Run injects the PORT environment variable (default 8080)
+EXPOSE 8080
 
-# Bind to 0.0.0.0:7860
-CMD gunicorn --bind 0.0.0.0:7860 --timeout 300 --workers 1 --threads 2 app.api:app
+# Bind to 0.0.0.0:$PORT
+CMD gunicorn --bind 0.0.0.0:${PORT:-8080} --timeout 300 --workers 1 --threads 2 app.api:app

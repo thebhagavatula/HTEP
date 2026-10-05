@@ -3,55 +3,92 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HTEP - Home</title>
-    <link rel="stylesheet" href="style.css">
+    <title>HTEP - Healthcare Text Extraction</title>
+    <meta name="description" content="Extract text and structured medical data from prescriptions, discharge summaries and reports with OCR and handwriting recognition.">
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+    <script>
+        // Apply the saved (or system) theme before first paint to avoid a flash
+        (function () {
+            var theme = 'light';
+            try {
+                theme = localStorage.getItem('theme') ||
+                    (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            } catch (e) {}
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500..700;1,9..144,500..700&family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
     <!-- Header / Nav -->
     <nav>
-        <a href="index.html" class="logo">HTEP</a>
+        <a href="index.html" class="logo" aria-label="HTEP home">
+            <span class="logo-mark" aria-hidden="true">
+                <svg viewBox="0 0 64 64" fill="none"><path d="M21 14h15l9 9v25a2 2 0 0 1-2 2H21a2 2 0 0 1-2-2V16a2 2 0 0 1 2-2z" stroke="#fff" stroke-width="4" stroke-linejoin="round"/><path d="M36 14v9h9" stroke="#fff" stroke-width="4" stroke-linejoin="round"/><path d="M32 29v12M26 35h12" stroke="#fff" stroke-width="4.5" stroke-linecap="round"/></svg>
+            </span>
+            <span>HTEP</span>
+        </a>
         <ul>
-            <li><a href="index.html">Home</a></li>
+            <li><a href="index.html" aria-current="page">Home</a></li>
             <li><a href="about.html">About</a></li>
-            <li><button id="theme-toggle" class="theme-toggle">
-                    <img id="theme-icon" src="assets/sun.svg">
+            <li><button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle dark mode">
+                    <img id="theme-icon" src="assets/moon.svg" alt="">
                 </button></li>
         </ul>
     </nav>
 
     <!-- Main Content -->
-    <div class="container">
-        <h1>Healthcare Text Extraction Platform</h1>
-        <p class="subtitle">Upload clear images for best results</p>
+    <main class="container">
+        <div id="engineStatus" class="engine-status" data-state="idle" role="status" aria-live="polite">
+            <span class="engine-dot" aria-hidden="true"></span>
+            <span id="engineStatusText">Connecting to extraction engine…</span>
+        </div>
 
-        <span class="upload-label-text">Supports: PDF, JPEG, PNG - Max 5 MB</span>
-        
-        <div class="upload-box">
-            <!-- Icon -->
-             <div class="upload-icon">
-                <!-- Updated: Using local SVG instead of FontAwesome -->
-                <img src="assets/upload.svg" alt="Upload" style="width: 50px; height: auto;">
+        <h1>Healthcare Text <span class="accent">Extraction</span> Platform</h1>
+        <p class="subtitle">Turn prescriptions, discharge summaries and medical reports into clean, structured text. Upload a clear image for best results.</p>
+
+        <section class="upload-card" aria-label="Upload a document">
+            <div class="upload-box" id="uploadBox">
+                <div class="upload-icon" aria-hidden="true">
+                    <i class="fas fa-cloud-arrow-up"></i>
+                </div>
+
+                <p class="upload-title">Drag &amp; drop your document here</p>
+                <p class="upload-hint">or</p>
+
+                <!-- Hidden File Input -->
+                <input type="file" id="pdfInput" accept=".pdf,.png,.jpeg,.jpg" hidden>
+
+                <!-- Custom Button triggers file input -->
+                <button class="btn btn-secondary" id="uploadTriggerBtn" type="button">
+                    <i class="fas fa-folder-open" aria-hidden="true"></i> Browse files
+                </button>
+
+                <span class="upload-label-text">Supports PDF, JPEG, PNG &middot; Max 5 MB</span>
+
+                <p id="fileNameDisplay" class="file-name-display"></p>
             </div>
-            
-            <!-- Hidden File Input -->
-            <input type="file" id="pdfInput" accept=".pdf,.png,.jpeg,.jpg" style="display: none;">
-            
-            <!-- Custom Button triggers file input -->
-            <button class="btn" id="uploadTriggerBtn">Click to upload image</button>
-            
-            <p id="fileNameDisplay" class="file-name-display"></p>
-            
-            <div id="loader" class="loader"></div>
-        </div>
 
-        <!-- Extract Button (Appears after file selection) -->
-        <div style="margin-top: 20px;">
-            <button id="extractBtn" class="btn" style="display: none;">Start Extraction</button>
-            <p id="statusMessage" style="color: red; margin-top: 10px;"></p>
-        </div>
-    </div>
+            <!-- Extract Button (enabled after file selection) -->
+            <div class="upload-actions">
+                <button id="extractBtn" class="btn btn-lg" type="button" disabled>
+                    <i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i> Start Extraction
+                </button>
+                <p id="statusMessage" class="status-message" role="status" aria-live="polite"></p>
+            </div>
+        </section>
+
+        <ul class="feature-row">
+            <li><i class="fas fa-print" aria-hidden="true"></i> Printed text OCR</li>
+            <li><i class="fas fa-pen-nib" aria-hidden="true"></i> Handwriting recognition</li>
+            <li><i class="fas fa-notes-medical" aria-hidden="true"></i> Structured medical data</li>
+        </ul>
+    </main>
 
     <footer>
         <p>&copy; 2026 HTEP Platform</p>

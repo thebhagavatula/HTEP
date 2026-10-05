@@ -4,153 +4,162 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HTEP - Result</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+    <script>
+        // Apply the saved (or system) theme before first paint to avoid a flash
+        (function () {
+            var theme = 'light';
+            try {
+                theme = localStorage.getItem('theme') ||
+                    (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            } catch (e) {}
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500..700;1,9..144,500..700&family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
     <nav>
-        <a href="index.html" class="logo">HTEP</a>
+        <a href="index.html" class="logo" aria-label="HTEP home">
+            <span class="logo-mark" aria-hidden="true">
+                <svg viewBox="0 0 64 64" fill="none"><path d="M21 14h15l9 9v25a2 2 0 0 1-2 2H21a2 2 0 0 1-2-2V16a2 2 0 0 1 2-2z" stroke="#fff" stroke-width="4" stroke-linejoin="round"/><path d="M36 14v9h9" stroke="#fff" stroke-width="4" stroke-linejoin="round"/><path d="M32 29v12M26 35h12" stroke="#fff" stroke-width="4.5" stroke-linecap="round"/></svg>
+            </span>
+            <span>HTEP</span>
+        </a>
         <ul>
             <li><a href="index.html">Home</a></li>
             <li><a href="about.html">About</a></li>
-            <li><button id="theme-toggle" class="theme-toggle">
-                    <img id="theme-icon" src="assets/sun.svg">
+            <li><button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle dark mode">
+                    <img id="theme-icon" src="assets/moon.svg" alt="">
                 </button></li>
         </ul>
     </nav>
 
-    <div class="container">
-        <h1>Extraction Results</h1>
-        <p class="subtitle" id="fileNameSub">Processing Complete</p>
-        
+    <main class="container results">
+        <header class="results-header">
+            <div>
+                <h1>Extraction Results</h1>
+                <p class="subtitle" id="fileNameSub">Processing Complete</p>
+            </div>
+            <div class="results-actions">
+                <button class="btn btn-secondary" id="copyBtn" type="button">
+                    <i class="fas fa-copy" aria-hidden="true"></i> <span>Copy text</span>
+                </button>
+                <a href="index.html" class="btn">
+                    <i class="fas fa-arrow-rotate-left" aria-hidden="true"></i> Upload new
+                </a>
+            </div>
+        </header>
+
+        <!-- Document type / urgency / timing chips -->
+        <div id="resultMeta" class="result-meta" hidden></div>
+
         <!-- Structured Data Display -->
         <div id="structuredData" style="display: none;">
-            
+
             <!-- Patient Info Card -->
             <div class="card info-card">
-                <div class="card-header"><i class="fas fa-user-circle"></i> Patient Information</div>
+                <div class="card-header"><i class="fas fa-user-circle" aria-hidden="true"></i> Patient Information</div>
                 <div class="card-grid">
-                    <div class="grid-item"><strong>Name:</strong> <span id="patName">-</span></div>
-                    <div class="grid-item"><strong>Age:</strong> <span id="patAge">-</span></div>
-                    <div class="grid-item"><strong>Gender:</strong> <span id="patGender">-</span></div>
-                    <div class="grid-item"><strong>Date:</strong> <span id="patDate">-</span></div>
-                    <div class="grid-item"><strong>Doctor:</strong> <span id="patDoc">-</span></div>
-                    <div class="grid-item"><strong>Hospital:</strong> <span id="patHosp">-</span></div>
+                    <div class="grid-item"><span class="label">Name</span><span id="patName">-</span></div>
+                    <div class="grid-item"><span class="label">Age</span><span id="patAge">-</span></div>
+                    <div class="grid-item"><span class="label">Gender</span><span id="patGender">-</span></div>
+                    <div class="grid-item"><span class="label">Date</span><span id="patDate">-</span></div>
+                    <div class="grid-item"><span class="label">Doctor</span><span id="patDoc">-</span></div>
+                    <div class="grid-item"><span class="label">Hospital</span><span id="patHosp">-</span></div>
                 </div>
             </div>
 
             <!-- Vitals Card -->
             <div id="vitalsSection" class="card info-card" style="display: none;">
-                <div class="card-header"><i class="fas fa-heartbeat"></i> Vitals</div>
+                <div class="card-header"><i class="fas fa-heartbeat" aria-hidden="true"></i> Vitals</div>
                 <div class="card-grid">
-                    <div class="grid-item"><strong>BP:</strong> <span id="vitBP">-</span></div>
-                    <div class="grid-item"><strong>Temp:</strong> <span id="vitTemp">-</span></div>
-                    <div class="grid-item"><strong>Pulse:</strong> <span id="vitPulse">-</span></div>
+                    <div class="grid-item"><span class="label">Blood pressure</span><span id="vitBP">-</span></div>
+                    <div class="grid-item"><span class="label">Temperature</span><span id="vitTemp">-</span></div>
+                    <div class="grid-item"><span class="label">Pulse</span><span id="vitPulse">-</span></div>
                 </div>
             </div>
 
-            <!-- Diagnosis Tags (reusing existing styles) -->
+            <!-- Diagnosis Tags -->
             <div id="diagnosisSection" class="detection-section" style="display: none;">
-                <h2 class="section-heading"><i class="fas fa-stethoscope"></i> Diagnosis</h2>
+                <h2 class="section-heading"><i class="fas fa-stethoscope" aria-hidden="true"></i> Diagnosis</h2>
                 <div id="diagnosisTags" class="tag-container"></div>
             </div>
 
             <!-- Medicines Table -->
             <div id="medicinesSection" class="detection-section" style="display: none;">
-                <h2 class="section-heading"><i class="fas fa-capsules"></i> Prescribed Medicines</h2>
-                <table class="corrections-table">
-                    <thead>
-                        <tr>
-                            <th>Medicine Name</th>
-                            <th>Dosage</th>
-                            <th>Frequency</th>
-                        </tr>
-                    </thead>
-                    <tbody id="medicinesBody"></tbody>
-                </table>
+                <h2 class="section-heading"><i class="fas fa-capsules" aria-hidden="true"></i> Prescribed Medicines</h2>
+                <div class="table-wrap">
+                    <table class="corrections-table">
+                        <thead>
+                            <tr>
+                                <th>Medicine Name</th>
+                                <th>Dosage</th>
+                                <th>Frequency</th>
+                            </tr>
+                        </thead>
+                        <tbody id="medicinesBody"></tbody>
+                    </table>
+                </div>
             </div>
 
             <!-- Instructions -->
             <div id="instructionsSection" class="detection-section" style="display: none;">
-                <h2 class="section-heading"><i class="fas fa-clipboard-list"></i> Instructions</h2>
+                <h2 class="section-heading"><i class="fas fa-clipboard-list" aria-hidden="true"></i> Instructions</h2>
                 <ul id="instructionsList" class="instructions-list"></ul>
             </div>
-            
+
         </div>
 
         <!-- Raw Text / Fallback -->
         <div class="detection-section">
-            <button class="corrections-toggle" id="rawTextToggle">
-                <i class="fas fa-file-alt"></i> Raw OCR Text
-                <i class="fas fa-chevron-down corrections-chevron" id="rawTextChevron"></i>
+            <button class="corrections-toggle" id="rawTextToggle" type="button" aria-expanded="true" aria-controls="rawTextBody">
+                <i class="fas fa-file-alt toggle-icon" aria-hidden="true"></i> Extracted Text
+                <i class="fas fa-chevron-down corrections-chevron" id="rawTextChevron" aria-hidden="true"></i>
             </button>
-            <div id="rawTextBody" class="corrections-body" style="display: block;">
+            <div id="rawTextBody" class="corrections-body">
                 <div id="displayText" class="text-content">Loading text...</div>
-                <div style="text-align: center; margin-top: 15px;">
-                    <button class="btn" onclick="copyText()">Copy Text</button>
-                    <a href="index.html" class="btn btn-secondary">Upload New</a>
-                </div>
             </div>
         </div>
 
         <!-- Corrections Applied -->
         <div id="correctionsSection" class="detection-section" style="display: none;">
-            <button class="corrections-toggle" id="correctionsToggle">
-                <i class="fas fa-wrench"></i> Dictionary Match & Corrections
+            <button class="corrections-toggle" id="correctionsToggle" type="button" aria-expanded="false" aria-controls="correctionsBody">
+                <i class="fas fa-wrench toggle-icon" aria-hidden="true"></i> Dictionary Match &amp; Corrections
                 <span id="correctionsCount" class="corrections-count">0</span>
-                <i class="fas fa-chevron-down corrections-chevron" id="correctionsChevron"></i>
+                <i class="fas fa-chevron-down corrections-chevron" id="correctionsChevron" aria-hidden="true"></i>
             </button>
             <div id="correctionsBody" class="corrections-body" style="display: none;">
-                <table class="corrections-table">
-                    <thead>
-                        <tr>
-                            <th>Original</th>
-                            <th>Matched</th>
-                            <th>Type</th>
-                        </tr>
-                    </thead>
-                    <tbody id="correctionsTableBody"></tbody>
-                </table>
+                <div class="table-wrap">
+                    <table class="corrections-table">
+                        <thead>
+                            <tr>
+                                <th>Original</th>
+                                <th>Matched</th>
+                                <th>Type</th>
+                            </tr>
+                        </thead>
+                        <tbody id="correctionsTableBody"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
-    </div>
+    </main>
 
     <footer>
         <p>&copy; 2026 HTEP Platform</p>
     </footer>
 
+    <!-- Theme toggle -->
+    <script src="app.js"></script>
+
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // --- Theme Toggle Functionality ---
-            const themeToggle = document.getElementById('theme-toggle');
-            const themeIcon = document.getElementById('theme-icon');
-
-            // Check for saved theme preference or default to light mode
-            const currentTheme = localStorage.getItem('theme') || 'light';
-            document.documentElement.setAttribute('data-theme', currentTheme);
-
-            // Update icon based on current theme
-            if (themeIcon) {
-                themeIcon.src = currentTheme === 'dark' ? 'assets/sun.svg' : 'assets/moon.svg';
-            }
-
-            // Toggle theme on button click
-            if (themeToggle) {
-                themeToggle.addEventListener('click', () => {
-                    const currentTheme = document.documentElement.getAttribute('data-theme');
-                    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-
-                    document.documentElement.setAttribute('data-theme', newTheme);
-                    localStorage.setItem('theme', newTheme);
-
-                    // Update icon
-                    if (themeIcon) {
-                        themeIcon.src = newTheme === 'dark' ? 'assets/sun.svg' : 'assets/moon.svg';
-                    }
-                });
-            }
-
             // --- Load extracted text ---
             const text = localStorage.getItem('extractedText');
             const fileName = localStorage.getItem('fileName');
@@ -171,7 +180,9 @@
                 try {
                     const data = JSON.parse(responseRaw);
                     const ext = data.extracted_data || {};
-                    
+
+                    renderMeta(data.classification || {}, data.timings || {});
+
                     if (hasUsefulData(ext)) {
                         renderStructuredData(ext);
                     } else {
@@ -179,7 +190,7 @@
                         renderDrugs(data.matched_drugs || []);
                         renderDiseases(data.matched_diseases || []);
                     }
-                    
+
                     renderCorrections(data.corrections || []);
                 } catch (e) {
                     console.warn('Could not parse htepResponse:', e);
@@ -187,8 +198,12 @@
             }
 
             // --- Toggles ---
-            setupToggle('correctionsToggle', 'correctionsBody', 'correctionsChevron');
-            setupToggle('rawTextToggle', 'rawTextBody', 'rawTextChevron');
+            setupToggle('correctionsToggle', 'correctionsBody');
+            setupToggle('rawTextToggle', 'rawTextBody');
+
+            // --- Copy ---
+            const copyBtn = document.getElementById('copyBtn');
+            if (copyBtn) copyBtn.addEventListener('click', copyText);
         });
 
         function hasUsefulData(ext) {
@@ -201,26 +216,68 @@
             return false;
         }
 
-        function setupToggle(toggleId, bodyId, chevronId) {
+        function setExpanded(toggleId, bodyId, expanded) {
+            const toggle = document.getElementById(toggleId);
+            const body = document.getElementById(bodyId);
+            if (!toggle || !body) return;
+            body.style.display = expanded ? 'block' : 'none';
+            toggle.setAttribute('aria-expanded', String(expanded));
+        }
+
+        function setupToggle(toggleId, bodyId) {
             const toggle = document.getElementById(toggleId);
             if (toggle) {
                 toggle.addEventListener('click', () => {
                     const body = document.getElementById(bodyId);
-                    const chevron = document.getElementById(chevronId);
-                    if (body.style.display === 'none') {
-                        body.style.display = 'block';
-                        if (chevron) chevron.style.transform = 'rotate(180deg)';
-                    } else {
-                        body.style.display = 'none';
-                        if (chevron) chevron.style.transform = 'rotate(0deg)';
-                    }
+                    setExpanded(toggleId, bodyId, body.style.display === 'none');
                 });
             }
         }
 
+        function renderMeta(classification, timings) {
+            const meta = document.getElementById('resultMeta');
+            const chips = [];
+
+            const docType = classification.document_type;
+            if (docType && docType !== 'unknown') {
+                chips.push(makeChip('chip-type', 'fa-file-lines', prettify(docType)));
+            }
+
+            const urgency = classification.urgency;
+            if (urgency) {
+                const labels = { routine: 'Routine', high: 'High priority', urgent: 'Urgent' };
+                const icon = urgency === 'routine' ? 'fa-check-circle' : 'fa-triangle-exclamation';
+                chips.push(makeChip('chip-urgency-' + urgency.replace(/[^a-z]/g, ''), icon, labels[urgency] || prettify(urgency)));
+            }
+
+            if (typeof timings.total === 'number') {
+                chips.push(makeChip('', 'fa-clock', 'Processed in ' + timings.total.toFixed(1) + 's'));
+            }
+
+            if (chips.length > 0) {
+                chips.forEach(c => meta.appendChild(c));
+                meta.hidden = false;
+            }
+        }
+
+        function makeChip(modifier, icon, label) {
+            const chip = document.createElement('span');
+            chip.className = ('chip ' + modifier).trim();
+            const i = document.createElement('i');
+            i.className = 'fas ' + icon;
+            i.setAttribute('aria-hidden', 'true');
+            chip.appendChild(i);
+            chip.appendChild(document.createTextNode(label));
+            return chip;
+        }
+
+        function prettify(value) {
+            return String(value).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        }
+
         function renderStructuredData(ext) {
             document.getElementById('structuredData').style.display = 'block';
-            
+
             // Patient Info
             document.getElementById('patName').innerText = ext.patient_name || '-';
             document.getElementById('patAge').innerText = ext.age || '-';
@@ -277,9 +334,9 @@
                     instList.appendChild(li);
                 });
             }
-            
-            // Hide raw text body by default if structured data exists
-            document.getElementById('rawTextBody').style.display = 'none';
+
+            // Collapse raw text by default if structured data exists
+            setExpanded('rawTextToggle', 'rawTextBody', false);
         }
 
         // Legacy functions kept for fallback
@@ -346,9 +403,14 @@
         }
 
         function copyText() {
-            const text = document.getElementById('displayText').innerText;
+            const text = document.getElementById('displayText').textContent;
+            const label = document.querySelector('#copyBtn span');
             navigator.clipboard.writeText(text).then(() => {
-                alert("Copied!");
+                if (!label) return;
+                label.textContent = 'Copied!';
+                setTimeout(() => { label.textContent = 'Copy text'; }, 1800);
+            }).catch(() => {
+                if (label) label.textContent = 'Copy failed';
             });
         }
     </script>

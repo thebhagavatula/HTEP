@@ -4,18 +4,39 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HTEP - About</title>
-    <link rel="stylesheet" href="style.css">
+    <meta name="description" content="About the Healthcare Text Extraction Platform: OCR and AI that turn medical documents into editable, searchable text.">
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+    <script>
+        // Apply the saved (or system) theme before first paint to avoid a flash
+        (function () {
+            var theme = 'light';
+            try {
+                theme = localStorage.getItem('theme') ||
+                    (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            } catch (e) {}
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500..700;1,9..144,500..700&family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
     <nav>
-        <a href="index.html" class="logo">HTEP</a>
+        <a href="index.html" class="logo" aria-label="HTEP home">
+            <span class="logo-mark" aria-hidden="true">
+                <svg viewBox="0 0 64 64" fill="none"><path d="M21 14h15l9 9v25a2 2 0 0 1-2 2H21a2 2 0 0 1-2-2V16a2 2 0 0 1 2-2z" stroke="#fff" stroke-width="4" stroke-linejoin="round"/><path d="M36 14v9h9" stroke="#fff" stroke-width="4" stroke-linejoin="round"/><path d="M32 29v12M26 35h12" stroke="#fff" stroke-width="4.5" stroke-linecap="round"/></svg>
+            </span>
+            <span>HTEP</span>
+        </a>
         <ul>
             <li><a href="index.html">Home</a></li>
-            <li><a href="about.html">About</a></li>
-            <li><button id="theme-toggle" class="theme-toggle">
-                    <img id="theme-icon" src="assets/sun.svg">
+            <li><a href="about.html" aria-current="page">About</a></li>
+            <li><button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle dark mode">
+                    <img id="theme-icon" src="assets/moon.svg" alt="">
                 </button></li>
         </ul>
     </nav>
@@ -46,27 +67,31 @@
 
             <!-- How It Works Section -->
             <section class="how-it-works-section">
-                <h2>How It Works</h2>
+                <h2 class="section-title">How It Works</h2>
+                <p class="section-lead">From scanned page to structured data in three steps.</p>
                 <div class="steps-grid">
                     <div class="step">
                         <div class="step-icon">
-                            <i class="fas fa-upload"></i>
+                            <i class="fas fa-upload" aria-hidden="true"></i>
                         </div>
-                        <h3>Step 1</h3>
+                        <span class="step-number">Step 1</span>
+                        <h3>Upload</h3>
                         <p>Upload your medical report (PDF, PNG, or JPEG).</p>
                     </div>
                     <div class="step">
                         <div class="step-icon">
-                            <i class="fas fa-cogs"></i>
+                            <i class="fas fa-cogs" aria-hidden="true"></i>
                         </div>
-                        <h3>Step 2</h3>
+                        <span class="step-number">Step 2</span>
+                        <h3>Process</h3>
                         <p>Our secure AI engine processes the image structure.</p>
                     </div>
                     <div class="step">
                         <div class="step-icon">
-                            <i class="fas fa-check-circle"></i>
+                            <i class="fas fa-check-circle" aria-hidden="true"></i>
                         </div>
-                        <h3>Step 3</h3>
+                        <span class="step-number">Step 3</span>
+                        <h3>Review</h3>
                         <p>Receive clean, extracted text instantly.</p>
                     </div>
                 </div>
@@ -74,7 +99,9 @@
 
             <!-- Call to Action -->
             <section class="cta-section">
-                <a href="index.html" class="btn btn-primary">Try it Now</a>
+                <h2>Ready to digitize a document?</h2>
+                <p>Upload a prescription or report and see the extracted text in seconds.</p>
+                <a href="index.html" class="btn btn-primary">Try it Now <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
             </section>
 
         </div>

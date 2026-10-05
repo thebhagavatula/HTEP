@@ -14,8 +14,9 @@ ENV HOME=/home/user \
 WORKDIR $HOME/app
 
 # Install Python dependencies first (better Docker cache)
-COPY --chown=user requirements-deploy.txt .
-RUN pip install --no-cache-dir -r requirements-deploy.txt
+# constraints-deploy.txt pins the full dependency tree to the last known-good build
+COPY --chown=user requirements-deploy.txt constraints-deploy.txt ./
+RUN pip install --no-cache-dir -r requirements-deploy.txt -c constraints-deploy.txt
 
 # Download spaCy model at build time
 RUN python -m spacy download en_core_web_sm

@@ -181,7 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Show elapsed time while processing
         let elapsed = 0;
         const tick = (prefix) => {
-            const hint = elapsed >= 20 ? ' Handwritten or multi-page documents can take a minute.' : '';
+            const hint = elapsed >= 20 ? ' Each PDF page or large photo takes about a minute.' : '';
             setStatus(`${prefix} ${elapsed}s.${hint}`);
         };
 
@@ -191,9 +191,9 @@ document.addEventListener('DOMContentLoaded', () => {
             await warmup;
             clearInterval(ticker);
 
-            // Abort controller with 5-minute timeout for slow cold-start processing
+            // Abort just after Cloud Run's 600s request timeout so the server's limit governs
             const controller = new AbortController();
-            timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000);
+            timeoutId = setTimeout(() => controller.abort(), 10 * 60 * 1000);
 
             tick('Reading your document…');
             ticker = setInterval(() => { elapsed++; tick('Reading your document…'); }, 1000);
@@ -264,7 +264,8 @@ async function warmUpBackend() {
     setState('warming', 'Waking up the extraction engine…');
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3 * 60 * 1000);
+    // A cold start on a fresh instance (image pull + model load) can take ~3 min
+    const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000);
 
     try {
         const res = await fetch(getApiBase() + '/status', { signal: controller.signal });

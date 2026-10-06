@@ -235,7 +235,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (error.name === 'AbortError') {
                 errorMsg = "Request timed out — the server took too long. Try a smaller image or try again later.";
             } else if (error instanceof TypeError) {
-                errorMsg = "Couldn't reach the extraction server. Check your connection and try again.";
+                errorMsg = "The extraction server didn't respond — it may be restarting. Please try again in a minute.";
             } else if (error.message) {
                 errorMsg = "Error: " + error.message;
             }

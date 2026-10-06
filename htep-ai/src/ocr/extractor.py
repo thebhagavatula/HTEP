@@ -18,7 +18,14 @@ from pathlib import Path
 from typing import Dict
 import cv2
 import numpy as np
-from pdf2image import convert_from_path
+from pdf2image import convert_from_path, pdfinfo_from_path
+
+# PaddleX's default text detection only enforces a *minimum* side (64px) and
+# lets images up to 4000px through at full size. On a 12 MP phone photo or a
+# 300 DPI page the detector alone needs >3 GB and Cloud Run OOM-kills the
+# container. Cap the longest side used for detection; recognition still reads
+# text crops from the full-resolution image.
+DET_MAX_SIDE = 1600
 
 # Import config toggle
 try:
@@ -52,6 +59,8 @@ class OCRExtractor:
                 use_doc_orientation_classify=False,
                 use_doc_unwarping=False,
                 use_textline_orientation=False,
+                text_det_limit_side_len=DET_MAX_SIDE,
+                text_det_limit_type="max",
             )
 
         elif self.engine_name == "tesseract":
@@ -127,10 +136,13 @@ class OCRExtractor:
             ocr_text = "\\n".join(pages.values())
         Returns dict: {1: "page 1 text", 2: "page 2 text", ...}
         """
-        images = convert_from_path(str(pdf_path), dpi=dpi)
+        # Render one page at a time so multi-page PDFs don't hold every
+        # 300 DPI page (~26 MB each) in memory at once.
+        page_count = pdfinfo_from_path(str(pdf_path))["Pages"]
 
         pages = {}
-        for i, page_img in enumerate(images, start=1):
+        for i in range(1, page_count + 1):
+            page_img = convert_from_path(str(pdf_path), dpi=dpi, first_page=i, last_page=i)[0]
             page_array = cv2.cvtColor(np.array(page_img), cv2.COLOR_RGB2BGR)
             pages[i] = self._ocr_array(page_array).strip()
 

@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import sys
+import threading
 import time
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
@@ -57,6 +58,7 @@ CORS(app)
 # on Cloud Run, causing startup timeouts. We lazy-load them instead.
 
 engines_loaded = False
+_engines_lock = threading.Lock()
 ocr_engine = None
 block_icr = None
 block_parser = None
@@ -66,11 +68,19 @@ medical_extractor = None
 doc_classifier = None
 
 def load_engines():
-    global engines_loaded, ocr_engine, block_icr, block_parser, llava_icr
-    global ocr_postprocessor, medical_extractor, doc_classifier
-    
     if engines_loaded:
         return
+
+    # Concurrent requests (e.g. the frontend's /status warm-up and an /upload)
+    # must not load the models twice: that doubles memory and gets the
+    # container OOM-killed on Cloud Run.
+    with _engines_lock:
+        if not engines_loaded:
+            _init_engines()
+
+def _init_engines():
+    global engines_loaded, ocr_engine, block_icr, block_parser, llava_icr
+    global ocr_postprocessor, medical_extractor, doc_classifier
 
     print("Initializing ML engines...", flush=True)
     t0 = time.time()
@@ -139,6 +149,17 @@ def serve_static(path):
 # API ROUTE
 # -------------------------------
 
+# Phone photos can be 12+ MP; segmenting them at full size for block ICR is
+# slow and memory-hungry, and the ICR model only looks at small character crops.
+ICR_MAX_SIDE = 2000
+
+def _limit_image_size(image, max_side: int):
+    h, w = image.shape[:2]
+    scale = max_side / max(h, w)
+    if scale >= 1:
+        return image
+    return cv2.resize(image, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+
 def _preview(text: str, limit: int = 180) -> str:
     if not text:
         return ""
@@ -189,6 +210,7 @@ def upload_file():
         if suffix in [".png", ".jpg", ".jpeg"]:
             image = cv2.imread(str(file_path))
             if image is not None:
+                image = _limit_image_size(image, ICR_MAX_SIDE)
 
                 # -------- BLOCK ICR --------
                 t0 = time.time()

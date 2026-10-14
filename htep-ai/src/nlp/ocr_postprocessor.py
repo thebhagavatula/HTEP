@@ -216,9 +216,14 @@ class OCRPostProcessor:
 
         try:
             # --- Single-word fuzzy correction ---
-            words = text.split()
+            # Split with the whitespace kept, so line breaks survive: the JSON
+            # extractor relies on them to tell fields and list items apart.
+            words = re.split(r'(\s+)', text)
             new_words = []
             for word in words:
+                if not word or word.isspace():
+                    new_words.append(word)
+                    continue
                 clean = re.sub(r'[^A-Za-z]', '', word).lower()
                 if len(clean) < 3:
                     new_words.append(word)
@@ -267,7 +272,7 @@ class OCRPostProcessor:
                 else:
                     new_words.append(word)
 
-            text = " ".join(new_words)
+            text = "".join(new_words)
 
             # --- Multi-word fuzzy detection ---
             multi_matches = self._find_multi_word_matches(

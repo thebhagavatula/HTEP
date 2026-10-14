@@ -21,6 +21,30 @@ except ImportError:
     SPACY_AVAILABLE = False
     logger.warning("SpaCy not installed — falling back to regex/dictionary only")
 
+DOSAGE_PATTERN = re.compile(
+    r'(\d+(?:\.\d+)?\s*(?:mg|g|ml|mcg|units?|tablets?|capsules?|drops?))', re.IGNORECASE
+)
+
+# Longer phrases come first so "morning and night" wins over "morning",
+# and "twice daily" over "daily".
+FREQUENCY_PATTERN = re.compile(
+    r'\b((?:once|twice|thrice)\s+(?:daily|a\s+day|a\s+week)'
+    r'|\d+\s+times\s+(?:a\s+day|daily)'
+    r'|morning\s+and\s+(?:night|evening)'
+    r'|(?:before|after|with)\s+(?:meals?|food|breakfast|lunch|dinner|sleep)'
+    r'|at\s+(?:bedtime|night)'
+    r'|every\s+\d+\s+hours?'
+    r'|[01]\s*-\s*[01]\s*-\s*[01]'
+    r'|daily|bid|tid|qid|qds|tds|bd|od|hs|sos|prn|stat|morning|night)\b',
+    re.IGNORECASE,
+)
+
+# Prescription line prefixes: "Tab. Paracetamol 500mg", "Cap Omez 20 mg"
+DOSAGE_FORM_PREFIX = re.compile(r'^(?:tabs?|caps?|syp|syr|inj|oint|susp)\.?\s+', re.IGNORECASE)
+
+# Degrees that trail a doctor's name: "Dr. Rao MBBS, MD"
+DOCTOR_DEGREES = re.compile(r'(?:[\s,]+(?:MBBS|MD|MS|DNB|DM|MCh|FRCS|MRCP|BDS|MDS|DGO|DCH))+\.?$')
+
 
 class MedicalDocExtractor:
     def __init__(self, drug_list: List[str], disease_list: List[str]):
@@ -80,19 +104,41 @@ class MedicalDocExtractor:
             data["date"] = date_match.group(1)
 
         # Patient Name: e.g., Patient: John Doe, Name: Jane Smith
-        name_match = re.search(r'(?:Patient|Name)\s*[:\-]\s*([A-Za-z\s]+?)(?=\n|,|\s+(?:Age|DOB|Date|Gender|Sex|Diagnosis|Rx|BP))', text, re.IGNORECASE)
+        # Allows initials/apostrophes ("Mr. K. Suresh", "O'Brien") and drops the honorific
+        name_match = re.search(
+            r"(?:Patient(?:'s)?\s*Name|Patient|Name)\s*[:\-]\s*(?:(?:Mr|Mrs|Ms|Miss|Master|Baby)\.?\s+)?"
+            r"([A-Za-z][A-Za-z.'\- \t]*?)(?=[ \t]*(?:\n|,|$)|\s+(?:Age|DOB|Date|Gender|Sex|Diagnosis|Rx|BP|ID|UHID|Mobile)\b)",
+            text,
+            re.IGNORECASE | re.MULTILINE,
+        )
         if name_match:
             data["patient_name"] = name_match.group(1).strip()
 
         # Doctor Name: e.g., Dr. Smith, Doctor: Jane Doe
-        doc_match = re.search(r'(?:Dr\.?|Doctor|Physician)\s*[:\-]?\s*([A-Za-z\.\s]+?)(?=\n|,|$|\s+(?:Patient|Hospital|Clinic|Date|Diagnosis|Rx|Age|BP))', text, re.IGNORECASE | re.MULTILINE)
+        # "Dr" must start a word and be followed by a capitalised name, so
+        # "Drink plenty of fluids" and "syndrome" are not read as doctors.
+        doc_match = re.search(
+            r"(?<![A-Za-z])(?:(?i:Doctor|Physician|Consultant)\s*[:\-]\s*(?:(?i:Dr)\.?\s*)?|(?i:Dr)\.?\s*)"
+            r"([A-Z][A-Za-z'\-]*\.?(?:[ \t]+[A-Z][A-Za-z'\-]*\.?){0,3})",
+            text,
+        )
         if doc_match:
-            data["doctor_name"] = ("Dr. " if not doc_match.group(1).strip().lower().startswith("dr") else "") + doc_match.group(1).strip()
+            data["doctor_name"] = "Dr. " + DOCTOR_DEGREES.sub("", doc_match.group(1).strip())
 
         # Hospital/Clinic (Require a colon to avoid matching things like "Hospital - Summary")
         hosp_match = re.search(r'(?:Hospital|Clinic|Medical Center|Health Center)\s*:\s*([^\n]+)', text, re.IGNORECASE)
         if hosp_match:
             data["hospital"] = hosp_match.group(1).strip()
+        else:
+            # Letterhead line: "CityCare Hospital - Discharge Summary", "SUNRISE CLINIC"
+            hosp_line = re.search(
+                r"^[ \t]*((?:[A-Z][\w'&.]*[ \t]+){1,5}"
+                r"(?i:Hospitals?|Clinic|Medical\s+Cent(?:er|re)|Health\s+Cent(?:er|re)|Nursing\s+Home|Polyclinic|Healthcare))\b",
+                text,
+                re.MULTILINE,
+            )
+            if hosp_line:
+                data["hospital"] = hosp_line.group(1).strip()
 
         # Age/Gender
         age_match = re.search(r'(?:Age)\s*[:\-]\s*(\d+)', text, re.IGNORECASE)
@@ -137,6 +183,17 @@ class MedicalDocExtractor:
                 if med_info:
                     data["medicines"].append(med_info)
 
+        # Lines anywhere that start with a dosage form ("Tab. Dolo 650mg 1-0-1")
+        # are medicines even without an Rx header or a dictionary match.
+        seen = {m["name"].lower() for m in data["medicines"]}
+        for line in text.split('\n'):
+            bare = re.sub(r'^[\-\*•o\d\.\)]+\s*', '', line.strip())
+            if DOSAGE_FORM_PREFIX.match(bare):
+                med_info = self._parse_medicine_line(bare)
+                if med_info and med_info["name"].lower() not in seen:
+                    data["medicines"].append(med_info)
+                    seen.add(med_info["name"].lower())
+
         # Instructions
         inst_match = re.search(r'(?:Instructions?|Advice|Plan|Follow up)\s*[:\-]\s*(.*)', text, re.IGNORECASE | re.DOTALL)
         if inst_match:
@@ -149,8 +206,8 @@ class MedicalDocExtractor:
     def _parse_medicine_line(self, line: str) -> Optional[Dict]:
         """Parses a medication line to extract name, dosage, and frequency."""
         # Simple extraction logic based on common patterns
-        dosage_match = re.search(r'(\d+(?:\.\d+)?\s*(?:mg|g|ml|mcg|units?|tablets?|capsules?|drops?))', line, re.IGNORECASE)
-        freq_match = re.search(r'\b((?:once|twice|thrice)\s+daily|daily|bid|tid|qid|prn|every\s+\d+\s+hours|(?:once|twice|thrice)\s+a\s+day|morning\s+and\s+night|morning|night|at\s+bedtime|after\s+meals?)\b', line, re.IGNORECASE)
+        dosage_match = DOSAGE_PATTERN.search(line)
+        freq_match = FREQUENCY_PATTERN.search(line)
         
         dosage = dosage_match.group(1) if dosage_match else None
         freq = freq_match.group(1) if freq_match else None
@@ -164,7 +221,8 @@ class MedicalDocExtractor:
             
         # Clean up name
         name = re.sub(r'^[\-\*o\d\.]+\s*', '', name).strip() # Remove bullets/numbering
-        
+        name = DOSAGE_FORM_PREFIX.sub('', name).strip()  # Remove "Tab." / "Cap." etc.
+
         if len(name) > 2:
             return {
                 "name": name,
@@ -217,7 +275,9 @@ class MedicalDocExtractor:
                     if len(clean_ent) > 3 and clean_ent.lower() != "opd":
                         data["chemicals"].append(clean_ent)
                 elif ent.label_ == "DISEASE":
-                    data["diseases"].append(ent.text.strip())
+                    # Skip vitals the model mislabels as diseases, e.g. "100.4F"
+                    if re.search(r'[A-Za-z]{3}', ent.text):
+                        data["diseases"].append(ent.text.strip())
         except Exception as e:
             logger.exception("SciSpaCy extraction failed: %s", e)
             
@@ -281,7 +341,10 @@ class MedicalDocExtractor:
                     if not final_data["doctor_name"]:
                         final_data["doctor_name"] = person
                 else:
-                    if not final_data["patient_name"] and person != final_data["doctor_name"]:
+                    doctor = (final_data["doctor_name"] or "").lower()
+                    if not final_data["patient_name"] and person.lower() not in doctor and not any(
+                        part in doctor for part in person.lower().split()[:2] if len(part) > 2
+                    ):
                         # Avoid replacing a regex-found patient name, but set if empty
                         final_data["patient_name"] = person
 
@@ -307,20 +370,21 @@ class MedicalDocExtractor:
         
         # Process chemicals and dict drugs, trying to parse context around them to get dosage
         potential_meds = set(scispacy_data["chemicals"] + dict_data["drugs"])
-        
-        for med_name in potential_meds:
+
+        # Longest first, so "potassium chloride" is kept and "potassium" is skipped
+        for med_name in sorted(potential_meds, key=len, reverse=True):
             # Check if already captured by regex
             is_substring = any(med_name.lower() in existing for existing in existing_meds_lower)
             if not is_substring:
                 # Try to extract dosage/freq near this mention in the raw text
                 # We'll grab a window of text around the first mention
-                match = re.search(r'\b' + re.escape(med_name) + r'\b(.{0,30})', text, re.IGNORECASE)
+                match = re.search(r'\b' + re.escape(med_name) + r'\b([^\n]{0,60})', text, re.IGNORECASE)
                 dosage = None
                 freq = None
                 if match:
                     window = match.group(1)
-                    dosage_match = re.search(r'(\d+(?:\.\d+)?\s*(?:mg|g|ml|mcg|units?|tablets?|capsules?|drops?))', window, re.IGNORECASE)
-                    freq_match = re.search(r'\b((?:once|twice|thrice)\s+daily|daily|bid|tid|qid|prn|every\s+\d+\s+hours|morning|night)\b', window, re.IGNORECASE)
+                    dosage_match = DOSAGE_PATTERN.search(window)
+                    freq_match = FREQUENCY_PATTERN.search(window)
                     if dosage_match: dosage = dosage_match.group(1)
                     if freq_match: freq = freq_match.group(1)
                 

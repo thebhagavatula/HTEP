@@ -5,7 +5,7 @@
 // Production backend: local machine via Cloudflare quick tunnel (GCP billing is off;
 // Cloud Run was https://htep-151629903010.us-central1.run.app). To point the frontend
 // elsewhere, set window.HTEP_API_BASE before this script loads.
-const HTEP_BACKEND_URL = 'https://ferrari-sitting-fell-commodity.trycloudflare.com';
+const HTEP_BACKEND_URL = 'https://loved-race-techrepublic-reflection.trycloudflare.com';
 
 function getApiBase() {
     if (window.HTEP_API_BASE) return window.HTEP_API_BASE;

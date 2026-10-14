@@ -199,24 +199,18 @@ document.addEventListener('DOMContentLoaded', () => {
             tick('Reading your document…');
             ticker = setInterval(() => { elapsed++; tick('Reading your document…'); }, 1000);
 
-            const response = await fetch(getApiBase() + '/upload', {
+            const response = await fetch(getApiBase() + '/jobs', {
                 method: 'POST',
                 body: formData,
                 signal: controller.signal
             });
+
+            if (!response.ok) throw new Error(await serverError(response));
+
+            const { job_id } = await response.json();
+            const data = await pollJob(job_id, controller.signal);
             clearTimeout(timeoutId);
             clearInterval(ticker);
-
-            if (!response.ok) {
-                let serverMsg = "Server error (" + response.status + ")";
-                try {
-                    const errBody = await response.json();
-                    if (errBody.error) serverMsg = errBody.error;
-                } catch (_) {}
-                throw new Error(serverMsg);
-            }
-
-            const data = await response.json();
 
             // Store corrected text (falls back to ocr_text if not available)
             const displayText = data.corrected_text || data.ocr_text || data.text || '';
@@ -248,6 +242,42 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
 });
+
+async function serverError(response) {
+    let message = "Server error (" + response.status + ")";
+    try {
+        const body = await response.json();
+        if (body.error) message = body.error;
+    } catch (_) {}
+    return message;
+}
+
+// A multi-page PDF can take minutes, longer than proxies such as Cloudflare
+// tunnels (100s) keep a request open, so the server processes the file in the
+// background and we poll for the result.
+async function pollJob(jobId, signal) {
+    let failures = 0;
+    while (true) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
+
+        let res;
+        try {
+            res = await fetch(getApiBase() + '/jobs/' + jobId, { signal });
+        } catch (err) {
+            // Ride out brief network blips; give up after ~10s of failures
+            if (err.name === 'AbortError' || ++failures > 5) throw err;
+            continue;
+        }
+        if (res.status >= 500 && ++failures <= 5) continue;
+        if (!res.ok) throw new Error(await serverError(res));
+        failures = 0;
+
+        const job = await res.json();
+        if (job.status === 'done') return job.result;
+        if (job.status === 'error') throw new Error(job.error || 'Processing failed');
+    }
+}
 
 /* ===============================
    BACKEND WARM-UP / STATUS PILL

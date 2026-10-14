@@ -4,6 +4,7 @@ from pathlib import Path
 import sys
 import threading
 import time
+import uuid
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
@@ -168,179 +169,199 @@ def _preview(text: str, limit: int = 180) -> str:
         return compact
     return compact[:limit] + "..."
 
+def _save_upload():
+    """Save the posted file. Returns (file_path, filename) or (None, error_response)."""
+    if "file" not in request.files:
+        return None, (jsonify({"error": "No file uploaded"}), 400)
+
+    file = request.files["file"]
+    if file.filename == "":
+        return None, (jsonify({"error": "Empty filename"}), 400)
+
+    filename = secure_filename(file.filename)
+    file_path = UPLOAD_DIR / filename
+    file.save(file_path)
+    return file_path, filename
+
+
+# The engines are not thread-safe, and two documents at once can exhaust
+# memory, so files are processed one at a time.
+_process_lock = threading.Lock()
+
+def _process_file(file_path: Path, filename: str) -> dict:
+    """Run OCR, ICR, post-processing and JSON extraction on a saved file."""
+    load_engines()
+    with _process_lock:
+        return _process_file_locked(file_path, filename)
+
+def _process_file_locked(file_path: Path, filename: str) -> dict:
+
+    print(f"File received: {filename}", flush=True)
+    request_start = time.time()
+    timings = {}
+
+    suffix = file_path.suffix.lower()
+
+    # ---------------- OCR ----------------
+    t0 = time.time()
+    if suffix == ".pdf":
+        pages = ocr_engine.extract_from_pdf(str(file_path))
+        ocr_text = "\n".join(pages.values())
+    else:
+        ocr_text = ocr_engine.extract_from_image(str(file_path))
+    ocr_time = round(time.time() - t0, 2)
+    timings["ocr"] = ocr_time
+    print(f"OCR completed in {ocr_time}s", flush=True)
+
+    # ---------------- BLOCK ICR (IMAGES ONLY) ----------------
+    block_text = ""
+    block_text_raw = ""
+    block_parse_result = None
+    llava_text = ""
+
+    if suffix in [".png", ".jpg", ".jpeg"]:
+        image = cv2.imread(str(file_path))
+        if image is not None:
+            image = _limit_image_size(image, ICR_MAX_SIDE)
+
+            # -------- BLOCK ICR --------
+            t0 = time.time()
+            block_text = block_icr.predict_paragraph(image)
+
+            # Fallback to sentence if single-line
+            if "\n" not in block_text:
+                block_text = block_icr.predict_sentence(image)
+            icr_time = round(time.time() - t0, 2)
+            timings["block_icr"] = icr_time
+            print(f"Block ICR completed in {icr_time}s", flush=True)
+
+            block_text_raw = block_text
+
+            # -------- BLOCK PARSER (SPACY + SCISPACY DICTIONARY) --------
+            if block_text.strip():
+                try:
+                    t0 = time.time()
+                    block_parse_result = block_parser.parse(block_text)
+                    block_text = block_parse_result.get("corrected_text", block_text)
+                    parser_time = round(time.time() - t0, 2)
+                    timings["block_parser"] = parser_time
+                    print(f"Block parser completed in {parser_time}s")
+                except Exception as e:
+                    print("Block parser failed:", e)
+
+            # -------- LLAVA ICR (EXPERIMENTAL) --------
+            if llava_icr is not None:
+                try:
+                    t0 = time.time()
+                    llava_result = llava_icr.predict_paragraph(image)
+                    llava_text = llava_result.get("text", "")
+                    llava_conf = llava_result.get("confidence", 0.0)
+                    llava_time = round(time.time() - t0, 2)
+                    timings["llava_icr"] = llava_time
+                    print(f"LLaVA ICR completed in {llava_time}s")
+                except Exception as e:
+                    print("LLaVa ICR failed:", e)
+                    llava_text = ""
+
+    # ---------------- MERGE OUTPUT ----------------
+    final_text = ocr_text.strip()
+
+    # ---------------- OCR POST-PROCESSING ----------------
+    post_result = None
+    matched_drugs = []
+    matched_diseases = []
+    post_corrections = []
+
+    if ocr_postprocessor is not None and final_text:
+        try:
+            t0 = time.time()
+            post_result = ocr_postprocessor.process(final_text)
+            final_text = post_result.get("corrected_text", final_text)
+            matched_drugs = post_result.get("matched_drugs", [])
+            matched_diseases = post_result.get("matched_diseases", [])
+            post_corrections = post_result.get("corrections", [])
+            postproc_time = round(time.time() - t0, 2)
+            timings["post_processing"] = postproc_time
+            print(f"Post-processing completed in {postproc_time}s")
+            print(f"  Drugs matched: {matched_drugs}")
+            print(f"  Diseases matched: {matched_diseases}")
+            print(f"  Corrections applied: {len(post_corrections)}")
+        except Exception as e:
+            print(f"Post-processing failed (falling back to raw OCR): {e}")
+            final_text = ocr_text.strip()
+
+    # ---------------- JSON EXTRACTION ----------------
+    extracted_data = {}
+    if medical_extractor is not None and final_text:
+        try:
+            t0 = time.time()
+            extracted_data = medical_extractor.extract(final_text)
+            extraction_time = round(time.time() - t0, 2)
+            timings["json_extraction"] = extraction_time
+            print(f"JSON extraction completed in {extraction_time}s")
+        except Exception as e:
+            print(f"JSON extraction failed: {e}")
+
+    # ---------------- DEBUG LOGS ----------------
+    print(f"OCR len={len(ocr_text)} preview={_preview(ocr_text)!r}")
+    print(f"BLOCK len={len(block_text)} preview={_preview(block_text)!r}")
+    print(f"LLAVA len={len(llava_text)} preview={_preview(llava_text)!r}")
+    print(f"FINAL len={len(final_text)} preview={_preview(final_text)!r}")
+    total_time = round(time.time() - request_start, 2)
+    timings["total"] = total_time
+    print(f"Total request time: {total_time}s")
+
+    # ---------------- DOCUMENT CLASSIFICATION ----------------
+    classification = {}
+    try:
+        class_result = doc_classifier.classify_document(final_text)
+        urgency_level, urgency_conf = doc_classifier.get_document_urgency(final_text)
+        classification = {
+            "document_type": class_result.document_type,
+            "confidence": round(class_result.confidence, 2),
+            "urgency": urgency_level,
+            "urgency_confidence": round(urgency_conf, 2),
+            "keywords_found": class_result.keywords_found[:10],
+        }
+    except Exception as e:
+        print(f"Classification failed: {e}")
+
+    response = {
+        "text": final_text,
+        "file": filename,
+        "ocr_text": ocr_text,
+        "corrected_text": final_text,
+        "matched_drugs": matched_drugs,
+        "matched_diseases": matched_diseases,
+        "corrections": post_corrections,
+        "extracted_data": extracted_data,
+        "classification": classification,
+        "timings": timings,
+    }
+
+    if block_text_raw.strip() and block_parse_result is not None:
+        response["block_text_raw"] = block_text_raw
+        response["block_text_parsed"] = block_text
+        response["block_parser"] = {
+            "backend": block_parse_result.get("backend", "unknown"),
+            "dictionary_matches": block_parse_result.get("dictionary_matches", []),
+            "dictionary_layers": block_parse_result.get(
+                "dictionary_layers", {"medical": [], "english": []}
+            ),
+            "entities": block_parse_result.get("entities", []),
+            "corrections": block_parse_result.get("corrections", []),
+        }
+
+    return response
+
+
 @app.route("/upload", methods=["POST"])
 def upload_file():
     try:
-        load_engines()
-        
-        if "file" not in request.files:
-            return jsonify({"error": "No file uploaded"}), 400
-
-        file = request.files["file"]
-        if file.filename == "":
-            return jsonify({"error": "Empty filename"}), 400
-
-        filename = secure_filename(file.filename)
-        file_path = UPLOAD_DIR / filename
-        file.save(file_path)
-
-        print(f"File received: {filename}", flush=True)
-        request_start = time.time()
-        timings = {}
-
-        suffix = file_path.suffix.lower()
-
-        # ---------------- OCR ----------------
-        t0 = time.time()
-        if suffix == ".pdf":
-            pages = ocr_engine.extract_from_pdf(str(file_path))
-            ocr_text = "\n".join(pages.values())
-        else:
-            ocr_text = ocr_engine.extract_from_image(str(file_path))
-        ocr_time = round(time.time() - t0, 2)
-        timings["ocr"] = ocr_time
-        print(f"OCR completed in {ocr_time}s", flush=True)
-
-        # ---------------- BLOCK ICR (IMAGES ONLY) ----------------
-        block_text = ""
-        block_text_raw = ""
-        block_parse_result = None
-        llava_text = ""
-
-        if suffix in [".png", ".jpg", ".jpeg"]:
-            image = cv2.imread(str(file_path))
-            if image is not None:
-                image = _limit_image_size(image, ICR_MAX_SIDE)
-
-                # -------- BLOCK ICR --------
-                t0 = time.time()
-                block_text = block_icr.predict_paragraph(image)
-
-                # Fallback to sentence if single-line
-                if "\n" not in block_text:
-                    block_text = block_icr.predict_sentence(image)
-                icr_time = round(time.time() - t0, 2)
-                timings["block_icr"] = icr_time
-                print(f"Block ICR completed in {icr_time}s", flush=True)
-
-                block_text_raw = block_text
-
-                # -------- BLOCK PARSER (SPACY + SCISPACY DICTIONARY) --------
-                if block_text.strip():
-                    try:
-                        t0 = time.time()
-                        block_parse_result = block_parser.parse(block_text)
-                        block_text = block_parse_result.get("corrected_text", block_text)
-                        parser_time = round(time.time() - t0, 2)
-                        timings["block_parser"] = parser_time
-                        print(f"Block parser completed in {parser_time}s")
-                    except Exception as e:
-                        print("Block parser failed:", e)
-
-                # -------- LLAVA ICR (EXPERIMENTAL) --------
-                if llava_icr is not None:
-                    try:
-                        t0 = time.time()
-                        llava_result = llava_icr.predict_paragraph(image)
-                        llava_text = llava_result.get("text", "")
-                        llava_conf = llava_result.get("confidence", 0.0)
-                        llava_time = round(time.time() - t0, 2)
-                        timings["llava_icr"] = llava_time
-                        print(f"LLaVA ICR completed in {llava_time}s")
-                    except Exception as e:
-                        print("LLaVa ICR failed:", e)
-                        llava_text = ""
-
-        # ---------------- MERGE OUTPUT ----------------
-        final_text = ocr_text.strip()
-
-        # ---------------- OCR POST-PROCESSING ----------------
-        post_result = None
-        matched_drugs = []
-        matched_diseases = []
-        post_corrections = []
-
-        if ocr_postprocessor is not None and final_text:
-            try:
-                t0 = time.time()
-                post_result = ocr_postprocessor.process(final_text)
-                final_text = post_result.get("corrected_text", final_text)
-                matched_drugs = post_result.get("matched_drugs", [])
-                matched_diseases = post_result.get("matched_diseases", [])
-                post_corrections = post_result.get("corrections", [])
-                postproc_time = round(time.time() - t0, 2)
-                timings["post_processing"] = postproc_time
-                print(f"Post-processing completed in {postproc_time}s")
-                print(f"  Drugs matched: {matched_drugs}")
-                print(f"  Diseases matched: {matched_diseases}")
-                print(f"  Corrections applied: {len(post_corrections)}")
-            except Exception as e:
-                print(f"Post-processing failed (falling back to raw OCR): {e}")
-                final_text = ocr_text.strip()
-
-        # ---------------- JSON EXTRACTION ----------------
-        extracted_data = {}
-        if medical_extractor is not None and final_text:
-            try:
-                t0 = time.time()
-                extracted_data = medical_extractor.extract(final_text)
-                extraction_time = round(time.time() - t0, 2)
-                timings["json_extraction"] = extraction_time
-                print(f"JSON extraction completed in {extraction_time}s")
-            except Exception as e:
-                print(f"JSON extraction failed: {e}")
-
-        # ---------------- DEBUG LOGS ----------------
-        print(f"OCR len={len(ocr_text)} preview={_preview(ocr_text)!r}")
-        print(f"BLOCK len={len(block_text)} preview={_preview(block_text)!r}")
-        print(f"LLAVA len={len(llava_text)} preview={_preview(llava_text)!r}")
-        print(f"FINAL len={len(final_text)} preview={_preview(final_text)!r}")
-        total_time = round(time.time() - request_start, 2)
-        timings["total"] = total_time
-        print(f"Total request time: {total_time}s")
-
-        # ---------------- DOCUMENT CLASSIFICATION ----------------
-        classification = {}
-        try:
-            class_result = doc_classifier.classify_document(final_text)
-            urgency_level, urgency_conf = doc_classifier.get_document_urgency(final_text)
-            classification = {
-                "document_type": class_result.document_type,
-                "confidence": round(class_result.confidence, 2),
-                "urgency": urgency_level,
-                "urgency_confidence": round(urgency_conf, 2),
-                "keywords_found": class_result.keywords_found[:10],
-            }
-        except Exception as e:
-            print(f"Classification failed: {e}")
-
-        response = {
-            "text": final_text,
-            "file": filename,
-            "ocr_text": ocr_text,
-            "corrected_text": final_text,
-            "matched_drugs": matched_drugs,
-            "matched_diseases": matched_diseases,
-            "corrections": post_corrections,
-            "extracted_data": extracted_data,
-            "classification": classification,
-            "timings": timings,
-        }
-
-        if block_text_raw.strip() and block_parse_result is not None:
-            response["block_text_raw"] = block_text_raw
-            response["block_text_parsed"] = block_text
-            response["block_parser"] = {
-                "backend": block_parse_result.get("backend", "unknown"),
-                "dictionary_matches": block_parse_result.get("dictionary_matches", []),
-                "dictionary_layers": block_parse_result.get(
-                    "dictionary_layers", {"medical": [], "english": []}
-                ),
-                "entities": block_parse_result.get("entities", []),
-                "corrections": block_parse_result.get("corrections", []),
-            }
-
-        return jsonify(response)
+        file_path, filename = _save_upload()
+        if file_path is None:
+            return filename
+        return jsonify(_process_file(file_path, filename))
 
     except Exception as e:
         print("ERROR DURING PROCESSING", flush=True)
@@ -348,6 +369,53 @@ def upload_file():
         sys.stdout.flush()
         sys.stderr.flush()
         return jsonify({"error": str(e)}), 500
+
+# -------------------------------
+# ASYNC JOBS
+# -------------------------------
+# A multi-page PDF can take minutes, longer than proxies such as Cloudflare
+# tunnels (100s) keep a request open. POST /jobs returns at once and the
+# client polls GET /jobs/<id> for the result.
+
+JOB_TTL_S = 3600
+_jobs = {}
+_jobs_lock = threading.Lock()
+
+def _run_job(job_id: str, file_path: Path, filename: str):
+    try:
+        update = {"status": "done", "result": _process_file(file_path, filename)}
+    except Exception as e:
+        print("ERROR DURING PROCESSING", flush=True)
+        traceback.print_exc()
+        update = {"status": "error", "error": str(e)}
+    with _jobs_lock:
+        _jobs[job_id].update(update)
+
+@app.route("/jobs", methods=["POST"])
+def create_job():
+    file_path, filename = _save_upload()
+    if file_path is None:
+        return filename
+
+    job_id = uuid.uuid4().hex
+    now = time.time()
+    with _jobs_lock:
+        for old in [k for k, j in _jobs.items()
+                    if j["status"] != "pending" and now - j["created"] > JOB_TTL_S]:
+            del _jobs[old]
+        _jobs[job_id] = {"status": "pending", "created": now}
+
+    threading.Thread(target=_run_job, args=(job_id, file_path, filename), daemon=True).start()
+    return jsonify({"job_id": job_id}), 202
+
+@app.route("/jobs/<job_id>")
+def get_job(job_id):
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+        if job is None:
+            return jsonify({"error": "Unknown job — the server may have restarted"}), 404
+        body = {k: v for k, v in job.items() if k != "created"}
+    return jsonify(body)
 
 # -------------------------------
 # RUN

@@ -98,8 +98,8 @@ class MedicalDocExtractor:
             "instructions": []
         }
 
-        # Date: e.g., 2026-07-01, 07/01/2026, 1st July 2026
-        date_match = re.search(r'\b(\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2}/\d{2,4}|\d{1,2}(st|nd|rd|th)?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4})\b', text, re.IGNORECASE)
+        # Date: e.g., 2026-07-01, 07/01/2026, 25.09.2026, 25-09-2026, 1st July 2026
+        date_match = re.search(r'\b(\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2}/\d{2,4}|\d{1,2}[.\-]\d{1,2}[.\-]\d{4}|\d{1,2}(st|nd|rd|th)?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4})\b', text, re.IGNORECASE)
         if date_match:
             data["date"] = date_match.group(1)
 
@@ -117,23 +117,28 @@ class MedicalDocExtractor:
         # Doctor Name: e.g., Dr. Smith, Doctor: Jane Doe
         # "Dr" must start a word and be followed by a capitalised name, so
         # "Drink plenty of fluids" and "syndrome" are not read as doctors.
-        doc_match = re.search(
+        # Name parts may be joined by "." with no space: "Dr.S.MUTHU". A
+        # self-referral ("Ref.by : Dr.SELF") is skipped in favour of the next doctor.
+        for doc_match in re.finditer(
             r"(?<![A-Za-z])(?:(?i:Doctor|Physician|Consultant)\s*[:\-]\s*(?:(?i:Dr)\.?\s*)?|(?i:Dr)\.?\s*)"
-            r"([A-Z][A-Za-z'\-]*\.?(?:[ \t]+[A-Z][A-Za-z'\-]*\.?){0,3})",
+            r"([A-Z][A-Za-z'\-]*(?:(?:\.[ \t]*|[ \t]+)[A-Z][A-Za-z'\-]*){0,3}\.?)",
             text,
-        )
-        if doc_match:
-            data["doctor_name"] = "Dr. " + DOCTOR_DEGREES.sub("", doc_match.group(1).strip())
+        ):
+            doc_name = DOCTOR_DEGREES.sub("", doc_match.group(1).strip()).strip(" .")
+            if doc_name and doc_name.lower() != "self":
+                data["doctor_name"] = "Dr. " + doc_name
+                break
 
         # Hospital/Clinic (Require a colon to avoid matching things like "Hospital - Summary")
         hosp_match = re.search(r'(?:Hospital|Clinic|Medical Center|Health Center)\s*:\s*([^\n]+)', text, re.IGNORECASE)
         if hosp_match:
             data["hospital"] = hosp_match.group(1).strip()
         else:
-            # Letterhead line: "CityCare Hospital - Discharge Summary", "SUNRISE CLINIC"
+            # Letterhead line: "CityCare Hospital - Discharge Summary", "SUNRISE CLINIC", "PREM SCANS"
             hosp_line = re.search(
                 r"^[ \t]*((?:[A-Z][\w'&.]*[ \t]+){1,5}"
-                r"(?i:Hospitals?|Clinic|Medical\s+Cent(?:er|re)|Health\s+Cent(?:er|re)|Nursing\s+Home|Polyclinic|Healthcare))\b",
+                r"(?i:Hospitals?|Clinic|Medical\s+Cent(?:er|re)|Health\s+Cent(?:er|re)|Nursing\s+Home|Polyclinic|Healthcare"
+                r"|Scans|Diagnostics?|Diagnostic\s+Cent(?:er|re)|Labs|Laboratories|Imaging))\b",
                 text,
                 re.MULTILINE,
             )
@@ -141,13 +146,20 @@ class MedicalDocExtractor:
                 data["hospital"] = hosp_line.group(1).strip()
 
         # Age/Gender
+        # Combined label first: "Age/Sex : 21.0Yrs/Male", "Age/Gender: 45 Y / F"
+        age_sex = re.search(
+            r'Age\s*/\s*(?:Sex|Gender)\s*[:\-]?\s*(\d{1,3})(?:\.\d+)?\s*(?:Y(?:rs?|ears?)?\.?)?\s*/\s*(Male|Female|M|F)\b',
+            text, re.IGNORECASE,
+        )
         age_match = re.search(r'(?:Age)\s*[:\-]\s*(\d+)', text, re.IGNORECASE)
-        if age_match:
+        if age_sex:
+            data["age"] = age_sex.group(1)
+        elif age_match:
             data["age"] = age_match.group(1)
-            
-        gender_match = re.search(r'(?:Gender|Sex)\s*[:\-]\s*(Male|Female|M|F)', text, re.IGNORECASE)
-        if gender_match:
-            val = gender_match.group(1).upper()
+
+        gender_match = re.search(r'(?:Gender|Sex)\s*[:\-]\s*(Male|Female|M|F)\b', text, re.IGNORECASE)
+        if age_sex or gender_match:
+            val = (age_sex or gender_match).group(2 if age_sex else 1).upper()
             data["gender"] = "Male" if val in ("MALE", "M") else ("Female" if val in ("FEMALE", "F") else val)
 
         # Vitals
@@ -317,6 +329,9 @@ class MedicalDocExtractor:
         if not text or not text.strip():
             return {}
 
+        # OCR sometimes emits the full-width colon "：" used in Asian fonts
+        text = text.replace("：", ":")
+
         # 1. Run all layers
         regex_data = self._extract_with_regex(text)
         spacy_data = self._extract_with_spacy(text)
@@ -327,12 +342,17 @@ class MedicalDocExtractor:
         final_data = regex_data.copy()
 
         # Merge Date
-        if not final_data["date"] and spacy_data["dates"]:
-            final_data["date"] = spacy_data["dates"][0]
+        # spaCy tags things like "10^3/μL" as DATE, so only accept a year or month name
+        if not final_data["date"]:
+            final_data["date"] = next(
+                (d for d in spacy_data["dates"]
+                 if re.search(r'\b(?:19|20)\d{2}\b|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\b', d, re.IGNORECASE)),
+                None,
+            )
 
-        # Merge Hospital
-        if not final_data["hospital"] and spacy_data["orgs"]:
-            final_data["hospital"] = spacy_data["orgs"][0]
+        # Merge Hospital (skip short acronyms such as "USG" or "ECG")
+        if not final_data["hospital"]:
+            final_data["hospital"] = next((o for o in spacy_data["orgs"] if len(o) > 4), None)
 
         # Merge Persons (try to guess Doctor vs Patient)
         if spacy_data["persons"]:

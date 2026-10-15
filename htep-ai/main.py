@@ -1,13 +1,17 @@
 # main.py
-# Command-line runner
+# Command-line runner: digitize one prescription and print the record as JSON.
+#   python main.py path/to/prescription.jpg
 
-from src.pipeline.controller import PipelineController
+import json
+import sys
 
-from src.config import SAMPLE_DATA_DIR
+from src.pipeline.digitizer import Digitizer
 
 if __name__ == "__main__":
-    controller = PipelineController()
-    output = controller.process_image(str(SAMPLE_DATA_DIR / "sample.png"))
-
-    print("\nFINAL TEXT:\n")
-    print(output["final_text"])
+    if len(sys.argv) != 2:
+        sys.exit("Usage: python main.py <prescription.pdf|png|jpg>")
+    result = Digitizer().process(sys.argv[1])
+    print(json.dumps(
+        {k: result[k] for k in ("extracted_data", "field_sources", "review_required", "ocr_confidence", "vlm", "timings")},
+        indent=2, ensure_ascii=False,
+    ))

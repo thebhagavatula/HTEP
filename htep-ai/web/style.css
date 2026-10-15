@@ -38,6 +38,7 @@
     /* Status */
     --success: #0e8a6a;
     --warning: #c27c0e;
+    --warning-soft: rgba(194, 124, 14, 0.1);
     --danger: #c0392b;
     --danger-soft: rgba(192, 57, 43, 0.08);
 
@@ -89,6 +90,7 @@
 
     --success: #34d399;
     --warning: #f5b544;
+    --warning-soft: rgba(245, 181, 68, 0.12);
     --danger: #f87171;
     --danger-soft: rgba(248, 113, 113, 0.1);
 
@@ -1256,5 +1258,197 @@ footer {
         animation-duration: 0.01ms !important;
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
+    }
+}
+
+/* ===============================
+   PRESCRIPTION REVIEW FORM
+=============================== */
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+.btn-sm {
+    margin-top: 0.9rem;
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+}
+
+.rx-form .field input,
+.rx-form .field textarea {
+    width: 100%;
+    padding: 0.5rem 0.65rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.95rem;
+    resize: vertical;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.rx-form .field input:focus,
+.rx-form .field textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.rx-form .grid-item .label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.rx-form .needs-review input,
+.rx-form .needs-review textarea {
+    border-color: var(--warning);
+    background: var(--warning-soft);
+}
+
+.rx-table td {
+    padding: 0.45rem 0.5rem;
+    vertical-align: middle;
+}
+
+.rx-table input {
+    min-width: 6.5rem;
+}
+
+.rx-table td:first-child input {
+    min-width: 9rem;
+}
+
+@media (max-width: 640px) {
+    .rx-form .field-wide {
+        grid-column: 1 / -1;
+    }
+}
+
+.rx-table td:first-child input {
+    font-weight: 600;
+}
+
+.row-actions {
+    width: 1%;
+    white-space: nowrap;
+    text-align: right;
+}
+
+.row-actions .label {
+    margin-right: 0.35rem;
+}
+
+.icon-btn {
+    padding: 0.4rem 0.5rem;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-subtle);
+    cursor: pointer;
+}
+
+.icon-btn:hover,
+.icon-btn:focus-visible {
+    background: var(--danger-soft);
+    color: var(--danger);
+}
+
+.badge {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    white-space: nowrap;
+    padding: 0.1rem 0.5rem;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    font: inherit;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.badge-ai {
+    border-color: var(--border);
+    background: var(--brand-soft);
+    color: var(--brand);
+}
+
+.badge-review {
+    border-color: var(--warning);
+    background: var(--warning-soft);
+    color: var(--warning);
+    cursor: pointer;
+}
+
+.badge-review:hover,
+.badge-review:focus-visible {
+    background: var(--warning);
+    color: var(--surface);
+}
+
+.badge-ok {
+    background: var(--accent-soft);
+    color: var(--success);
+}
+
+.review-banner {
+    display: flex;
+    gap: 0.8rem;
+    align-items: flex-start;
+    margin: 0 0 1.5rem;
+    padding: 0.9rem 1.1rem;
+    border: 1px solid var(--warning);
+    border-radius: var(--radius);
+    background: var(--warning-soft);
+    color: var(--text);
+    font-size: 0.92rem;
+    line-height: 1.5;
+}
+
+.review-banner[hidden] {
+    display: none;
+}
+
+.review-banner > i {
+    margin-top: 0.2rem;
+    color: var(--warning);
+}
+
+.chip-ai {
+    color: var(--brand);
+}
+
+@media print {
+    nav,
+    footer,
+    .results-actions,
+    .review-banner,
+    #addMedicineBtn,
+    .row-actions,
+    #rawTextToggle,
+    #rawTextBody,
+    #correctionsSection,
+    .result-meta {
+        display: none !important;
+    }
+
+    body {
+        background: #fff;
+    }
+
+    .rx-form .field input,
+    .rx-form .field textarea {
+        border: none;
+        padding: 0;
+        background: none;
     }
 }

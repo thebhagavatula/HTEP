@@ -45,7 +45,7 @@
     <header class="hero">
         <div class="container">
             <h1>About HTEP</h1>
-            <p class="hero-subtitle">Healthcare Text Extraction Platform</p>
+            <p class="hero-subtitle">A prescription digitizer for clinics and pharmacies</p>
         </div>
     </header>
 
@@ -56,11 +56,18 @@
             <!-- Our Mission Section -->
             <section class="mission-section">
                 <div class="mission-card">
-                    <h2>Our Mission</h2>
+                    <h2>Why HTEP</h2>
                     <p>
-                        The Healthcare Text Extraction Platform (HTEP) simplifies the process of digitizing medical records.
-                        By leveraging advanced Optical Character Recognition (OCR) and AI, we transform locked PDF documents
-                        and images into editable, searchable text.
+                        Pharmacies and clinics still re-type paper prescriptions by hand, which is slow and
+                        error-prone. HTEP reads a photo or scan of a prescription and fills in the medicines,
+                        doses, frequencies and durations, plus patient and doctor details, so staff only have
+                        to check them.
+                    </p>
+                    <p>
+                        Every value says where it came from. Text read by OCR is taken straight from the page.
+                        When OCR struggles, for example with handwriting, an AI vision model reads the image too,
+                        and anything it reports that cannot be found in the scanned text is marked
+                        <strong>Check</strong> instead of being trusted.
                     </p>
                 </div>
             </section>
@@ -68,7 +75,7 @@
             <!-- How It Works Section -->
             <section class="how-it-works-section">
                 <h2 class="section-title">How It Works</h2>
-                <p class="section-lead">From scanned page to structured data in three steps.</p>
+                <p class="section-lead">From a paper prescription to a checked digital record in three steps.</p>
                 <div class="steps-grid">
                     <div class="step">
                         <div class="step-icon">
@@ -76,15 +83,15 @@
                         </div>
                         <span class="step-number">Step 1</span>
                         <h3>Upload</h3>
-                        <p>Upload your medical report (PDF, PNG, or JPEG).</p>
+                        <p>Upload a photo or scan of the prescription (PDF, PNG or JPEG).</p>
                     </div>
                     <div class="step">
                         <div class="step-icon">
                             <i class="fas fa-cogs" aria-hidden="true"></i>
                         </div>
                         <span class="step-number">Step 2</span>
-                        <h3>Process</h3>
-                        <p>Our secure AI engine processes the image structure.</p>
+                        <h3>Read</h3>
+                        <p>OCR reads the page and pulls out each field. An AI vision model helps when the OCR is unsure.</p>
                     </div>
                     <div class="step">
                         <div class="step-icon">
@@ -92,15 +99,32 @@
                         </div>
                         <span class="step-number">Step 3</span>
                         <h3>Review</h3>
-                        <p>Receive clean, extracted text instantly.</p>
+                        <p>Check the highlighted fields, fix anything that is wrong, then export to CSV or JSON, or print.</p>
                     </div>
+                </div>
+            </section>
+
+            <!-- Roadmap -->
+            <section class="mission-section">
+                <div class="mission-card">
+                    <h2>Coming next</h2>
+                    <p>
+                        <strong>Lab reports:</strong> test names, values, units and reference ranges, with
+                        out-of-range results flagged.
+                        <strong>Personal health records:</strong> a patient's prescriptions and reports over time,
+                        with a medicine schedule and lab-value trends.
+                    </p>
+                    <p>
+                        Uploaded files are deleted as soon as they are processed. HTEP helps with data entry; it does
+                        not give medical advice, and a person should always check the record against the original.
+                    </p>
                 </div>
             </section>
 
             <!-- Call to Action -->
             <section class="cta-section">
-                <h2>Ready to digitize a document?</h2>
-                <p>Upload a prescription or report and see the extracted text in seconds.</p>
+                <h2>Ready to digitize a prescription?</h2>
+                <p>Upload one and get an editable medicine list in seconds.</p>
                 <a href="index.html" class="btn btn-primary">Try it Now <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
             </section>
 

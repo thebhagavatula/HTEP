@@ -2,13 +2,12 @@ services:
   - type: web
     name: htep-backend
     env: docker
-    plan: free
+    # The OCR stack peaks at ~650 MB, more than the free plan's 512 MB
+    plan: standard
     dockerfilePath: ./Dockerfile
     healthCheckPath: /
     envVars:
       - key: OCR_ENGINE
-        value: paddle
-      - key: FLASK_ENV
-        value: production
-      - key: TESSERACT_CMD_PATH
-        value: tesseract
+        value: rapid
+      - key: VLM_MODE
+        value: "off"

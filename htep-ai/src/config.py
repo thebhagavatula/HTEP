@@ -28,13 +28,24 @@ DISEASE_DICT_PATH = Path(os.getenv("HTEP_DISEASE_DICT", DICTIONARY_DIR / "diseas
 DRUG_FUZZY_THRESHOLD = int(os.getenv("HTEP_DRUG_FUZZY_THRESHOLD", "85"))
 DISEASE_FUZZY_THRESHOLD = int(os.getenv("HTEP_DISEASE_FUZZY_THRESHOLD", "85"))
 
-OCR_ENGINE = "paddle"  # switch to "tesseract" anytime to roll back instantly
+# "rapid" (default, ONNX Runtime), "paddle" (needs paddlepaddle) or "tesseract"
+OCR_ENGINE = os.getenv("OCR_ENGINE", "rapid")
 
 # Tesseract Configuration
 TESSERACT_CMD_PATH = os.getenv("TESSERACT_CMD_PATH", "tesseract")
 
-# Model configurations
-LLAVA_MODEL_TAG = os.getenv("LLAVA_MODEL_TAG", "llava")
+# Vision-language model (optional, runs as a separate service; see src/vlm/client.py)
+# VLM_URL empty = disabled. VLM_API is "ollama" or "openai" (vLLM and other
+# OpenAI-compatible servers).
+VLM_URL = os.getenv("VLM_URL", "")
+VLM_API = os.getenv("VLM_API", "ollama")
+VLM_MODEL = os.getenv("VLM_MODEL", "qwen2.5vl:7b")
+VLM_TIMEOUT_S = float(os.getenv("VLM_TIMEOUT_S", "90"))
+VLM_MAX_IMAGE_SIDE = int(os.getenv("VLM_MAX_IMAGE_SIDE", "1280"))
+# "fallback": ask the VLM only when OCR looks unreliable (low confidence, or no
+# medicines found). "always": every image/first PDF page. "off": never.
+VLM_MODE = os.getenv("VLM_MODE", "fallback")
+VLM_MIN_OCR_CONFIDENCE = float(os.getenv("VLM_MIN_OCR_CONFIDENCE", "0.85"))
 
 # Ensure required minimal directories exist
 RAW_DATA_DIR.mkdir(parents=True, exist_ok=True)

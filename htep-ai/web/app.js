@@ -182,7 +182,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Show elapsed time while processing
         let elapsed = 0;
         const tick = (prefix) => {
-            const hint = elapsed >= 20 ? ' Each PDF page or large photo takes about a minute.' : '';
+            const hint = elapsed >= 20 ? ' Multi-page PDFs and handwritten prescriptions take longer.' : '';
             setStatus(`${prefix} ${elapsed}s.${hint}`);
         };
 
@@ -196,8 +196,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const controller = new AbortController();
             timeoutId = setTimeout(() => controller.abort(), 10 * 60 * 1000);
 
-            tick('Reading your document…');
-            ticker = setInterval(() => { elapsed++; tick('Reading your document…'); }, 1000);
+            tick('Reading your prescription…');
+            ticker = setInterval(() => { elapsed++; tick('Reading your prescription…'); }, 1000);
 
             const response = await fetch(getApiBase() + '/jobs', {
                 method: 'POST',

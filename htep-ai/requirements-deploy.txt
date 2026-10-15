@@ -1,60 +1,24 @@
 # ============================================
-# HTEP-AI Production Dependencies
+# HTEP Prescription Digitizer: production dependencies
 # ============================================
-# Use this file for deployment (Dockerfile / cloud platform)
-# Excludes dev tools: jupyter, matplotlib, pytest, etc.
-
-# Core OCR and Image Processing
-opencv-python-headless==4.10.0.84
-pdf2image==1.17.0
-Pillow==10.4.0
-
-# PaddleOCR (primary OCR engine)
-paddleocr>=3.7.0
-paddlepaddle>=3.3.0
-
-# Tesseract (backup OCR engine)
-pytesseract==0.3.13
+# Used by the Dockerfile. constraints-deploy.txt pins the full tree.
+# No PaddlePaddle, TensorFlow or spaCy: OCR runs PP-OCR models on ONNX
+# Runtime, and the optional vision model runs as a separate service (VLM_URL).
 
 # API server
-Flask==3.1.1
-Flask-Cors==5.0.0
-gunicorn>=22.0.0
+Flask==3.1.3
+Flask-Cors==6.0.5
+gunicorn==23.0.0
+psutil==7.2.2
+python-dotenv==1.2.4
 
-# Data Processing
-pandas>=2.2.0,<2.3.0
-numpy>=1.26.4,<2.1
+# OCR
+rapidocr==3.10.0
+onnxruntime==1.31.0
+opencv-python-headless==5.0.0.93
+numpy==2.5.4
+pdf2image==1.17.0
+Pillow==12.3.0
 
-# Machine Learning (ICR Training)
-scikit-learn==1.5.2
-
-# Deep Learning (CNN-based ICR)
-tensorflow>=2.18.0,<2.19.0; python_version < "3.13"
-
-# Text Processing
-nltk==3.9.1
-rapidfuzz>=3.0.0
-
-# NLP parsing for block handwriting normalization
-spacy==3.7.5
-
-# Progress bars and utilities
-tqdm==4.67.1
-
-# Logging and configuration
-python-dotenv==1.0.1
-
-# Process monitoring (for /status endpoint)
-psutil>=5.9.0
-
-# Data validation
-pydantic==2.10.3
-
-# Character encoding detection
-chardet==5.2.0
-
-# JSON validation
-jsonschema==4.23.0
-
-# LLaVa Integration (optional — gracefully disabled if Ollama unavailable)
-ollama==0.4.5
+# Text processing
+RapidFuzz==3.14.6

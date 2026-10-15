@@ -39,8 +39,17 @@ FREQUENCY_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+# "x 5 days", "for 2 weeks", "× 1 month"
+DURATION_PATTERN = re.compile(
+    r'(?:\bx|×|\bfor)\s*(\d+)\s*(days?|weeks?|months?)\b', re.IGNORECASE
+)
+
 # Prescription line prefixes: "Tab. Paracetamol 500mg", "Cap Omez 20 mg"
 DOSAGE_FORM_PREFIX = re.compile(r'^(?:tabs?|caps?|syp|syr|inj|oint|susp)\.?\s+', re.IGNORECASE)
+
+def _duration(text: str) -> Optional[str]:
+    match = DURATION_PATTERN.search(text)
+    return f"{match.group(1)} {match.group(2).lower()}" if match else None
 
 # Degrees that trail a doctor's name: "Dr. Rao MBBS, MD"
 DOCTOR_DEGREES = re.compile(r'(?:[\s,]+(?:MBBS|MD|MS|DNB|DM|MCh|FRCS|MRCP|BDS|MDS|DGO|DCH))+\.?$')
@@ -239,7 +248,8 @@ class MedicalDocExtractor:
             return {
                 "name": name,
                 "dosage": dosage,
-                "frequency": freq
+                "frequency": freq,
+                "duration": _duration(line),
             }
         return None
 
@@ -413,7 +423,8 @@ class MedicalDocExtractor:
                     final_data["medicines"].append({
                         "name": med_name.title(),
                         "dosage": dosage,
-                        "frequency": freq
+                        "frequency": freq,
+                        "duration": _duration(match.group(1)) if match else None,
                     })
                     existing_meds_lower.add(med_name.lower())
 

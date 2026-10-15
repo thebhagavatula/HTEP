@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HTEP - Result</title>
+    <title>HTEP - Prescription Review</title>
     <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
     <script>
         // Apply the saved (or system) theme before first paint to avoid a flash
@@ -43,15 +43,21 @@
     <main class="container results">
         <header class="results-header">
             <div>
-                <h1>Extraction Results</h1>
-                <p class="subtitle" id="fileNameSub">Processing Complete</p>
+                <h1>Prescription Review</h1>
+                <p class="subtitle" id="fileNameSub">Check each field against the original, then export.</p>
             </div>
             <div class="results-actions">
-                <button class="btn btn-secondary" id="copyBtn" type="button">
-                    <i class="fas fa-copy" aria-hidden="true"></i> <span>Copy text</span>
+                <button class="btn btn-secondary" id="exportJsonBtn" type="button">
+                    <i class="fas fa-file-code" aria-hidden="true"></i> JSON
+                </button>
+                <button class="btn btn-secondary" id="exportCsvBtn" type="button">
+                    <i class="fas fa-file-csv" aria-hidden="true"></i> CSV
+                </button>
+                <button class="btn btn-secondary" id="printBtn" type="button">
+                    <i class="fas fa-print" aria-hidden="true"></i> Print
                 </button>
                 <a href="index.html" class="btn">
-                    <i class="fas fa-arrow-rotate-left" aria-hidden="true"></i> Upload new
+                    <i class="fas fa-arrow-rotate-left" aria-hidden="true"></i> New upload
                 </a>
             </div>
         </header>
@@ -59,62 +65,71 @@
         <!-- Document type / urgency / timing chips -->
         <div id="resultMeta" class="result-meta" hidden></div>
 
-        <!-- Structured Data Display -->
-        <div id="structuredData" style="display: none;">
+        <!-- Fields that came from the AI reader and were not found in the scanned text -->
+        <div id="reviewBanner" class="review-banner" role="status" hidden>
+            <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+            <div>
+                <strong id="reviewCount"></strong>
+                <span>Fields marked <span class="badge badge-review">Check</span> were read by the AI model but could not be found in the scanned text. Compare them with the original before using this record.</span>
+            </div>
+        </div>
 
-            <!-- Patient Info Card -->
+        <form id="rxForm" class="rx-form" autocomplete="off" onsubmit="return false">
+
+            <!-- Patient / prescriber -->
             <div class="card info-card">
-                <div class="card-header"><i class="fas fa-user-circle" aria-hidden="true"></i> Patient Information</div>
+                <div class="card-header"><i class="fas fa-user-circle" aria-hidden="true"></i> Patient &amp; prescriber</div>
                 <div class="card-grid">
-                    <div class="grid-item"><span class="label">Name</span><span id="patName">-</span></div>
-                    <div class="grid-item"><span class="label">Age</span><span id="patAge">-</span></div>
-                    <div class="grid-item"><span class="label">Gender</span><span id="patGender">-</span></div>
-                    <div class="grid-item"><span class="label">Date</span><span id="patDate">-</span></div>
-                    <div class="grid-item"><span class="label">Doctor</span><span id="patDoc">-</span></div>
-                    <div class="grid-item"><span class="label">Hospital</span><span id="patHosp">-</span></div>
+                    <label class="grid-item field"><span class="label">Patient name</span><input name="patient_name"></label>
+                    <label class="grid-item field"><span class="label">Age</span><input name="age"></label>
+                    <label class="grid-item field"><span class="label">Gender</span><input name="gender"></label>
+                    <label class="grid-item field"><span class="label">Date</span><input name="date"></label>
+                    <label class="grid-item field"><span class="label">Doctor</span><input name="doctor_name"></label>
+                    <label class="grid-item field"><span class="label">Hospital / clinic</span><input name="hospital"></label>
                 </div>
             </div>
 
-            <!-- Vitals Card -->
-            <div id="vitalsSection" class="card info-card" style="display: none;">
-                <div class="card-header"><i class="fas fa-heartbeat" aria-hidden="true"></i> Vitals</div>
-                <div class="card-grid">
-                    <div class="grid-item"><span class="label">Blood pressure</span><span id="vitBP">-</span></div>
-                    <div class="grid-item"><span class="label">Temperature</span><span id="vitTemp">-</span></div>
-                    <div class="grid-item"><span class="label">Pulse</span><span id="vitPulse">-</span></div>
-                </div>
-            </div>
-
-            <!-- Diagnosis Tags -->
-            <div id="diagnosisSection" class="detection-section" style="display: none;">
-                <h2 class="section-heading"><i class="fas fa-stethoscope" aria-hidden="true"></i> Diagnosis</h2>
-                <div id="diagnosisTags" class="tag-container"></div>
-            </div>
-
-            <!-- Medicines Table -->
-            <div id="medicinesSection" class="detection-section" style="display: none;">
-                <h2 class="section-heading"><i class="fas fa-capsules" aria-hidden="true"></i> Prescribed Medicines</h2>
+            <!-- Medicines -->
+            <div class="detection-section">
+                <h2 class="section-heading"><i class="fas fa-capsules" aria-hidden="true"></i> Medicines</h2>
                 <div class="table-wrap">
-                    <table class="corrections-table">
+                    <table class="corrections-table rx-table">
                         <thead>
                             <tr>
-                                <th>Medicine Name</th>
-                                <th>Dosage</th>
+                                <th>Medicine</th>
+                                <th>Dose</th>
                                 <th>Frequency</th>
+                                <th>Duration</th>
+                                <th><span class="visually-hidden">Status and actions</span></th>
                             </tr>
                         </thead>
                         <tbody id="medicinesBody"></tbody>
                     </table>
                 </div>
+                <button class="btn btn-secondary btn-sm" id="addMedicineBtn" type="button">
+                    <i class="fas fa-plus" aria-hidden="true"></i> Add medicine
+                </button>
             </div>
 
-            <!-- Instructions -->
-            <div id="instructionsSection" class="detection-section" style="display: none;">
-                <h2 class="section-heading"><i class="fas fa-clipboard-list" aria-hidden="true"></i> Instructions</h2>
-                <ul id="instructionsList" class="instructions-list"></ul>
+            <!-- Diagnosis / advice -->
+            <div class="card info-card">
+                <div class="card-header"><i class="fas fa-stethoscope" aria-hidden="true"></i> Diagnosis &amp; advice</div>
+                <div class="card-grid">
+                    <label class="grid-item field field-wide"><span class="label">Diagnosis (one per line)</span><textarea name="diagnosis" rows="3"></textarea></label>
+                    <label class="grid-item field field-wide"><span class="label">Advice / instructions (one per line)</span><textarea name="instructions" rows="3"></textarea></label>
+                </div>
             </div>
 
-        </div>
+            <!-- Vitals -->
+            <div class="card info-card">
+                <div class="card-header"><i class="fas fa-heartbeat" aria-hidden="true"></i> Vitals</div>
+                <div class="card-grid">
+                    <label class="grid-item field"><span class="label">Blood pressure</span><input name="vitals.bp"></label>
+                    <label class="grid-item field"><span class="label">Temperature</span><input name="vitals.temp"></label>
+                    <label class="grid-item field"><span class="label">Pulse</span><input name="vitals.pulse"></label>
+                </div>
+            </div>
+        </form>
 
         <!-- Raw Text / Fallback -->
         <div class="detection-section">
@@ -159,61 +174,191 @@
     <script src="app.js"></script>
 
     <script>
+        const SCALAR_FIELDS = ['patient_name', 'age', 'gender', 'date', 'doctor_name', 'hospital'];
+        const VITAL_FIELDS = ['bp', 'temp', 'pulse'];
+        let fileName = '';
+
         document.addEventListener('DOMContentLoaded', () => {
-            // --- Load extracted text ---
             const text = localStorage.getItem('extractedText');
-            const fileName = localStorage.getItem('fileName');
+            fileName = localStorage.getItem('fileName') || '';
 
-            const textContainer = document.getElementById('displayText');
-            const fileSub = document.getElementById('fileNameSub');
+            document.getElementById('displayText').innerText = text || 'No text found.';
+            if (fileName) document.getElementById('fileNameSub').innerText =
+                'Source: ' + fileName + ' · Check each field against the original, then export.';
 
-            if (text) {
-                textContainer.innerText = text;
-                fileSub.innerText = "Source: " + (fileName || "Unknown File");
-            } else {
-                textContainer.innerText = "No text found.";
+            let data = {};
+            try {
+                data = JSON.parse(localStorage.getItem('htepResponse') || '{}');
+            } catch (e) {
+                console.warn('Could not parse htepResponse:', e);
             }
 
-            // --- Load full response data (drugs, diseases, corrections, extracted JSON) ---
-            const responseRaw = localStorage.getItem('htepResponse');
-            if (responseRaw) {
-                try {
-                    const data = JSON.parse(responseRaw);
-                    const ext = data.extracted_data || {};
+            renderMeta(data.classification || {}, data.timings || {}, data.vlm || {});
+            fillForm(data);
+            renderCorrections(data.corrections || []);
 
-                    renderMeta(data.classification || {}, data.timings || {});
-
-                    if (hasUsefulData(ext)) {
-                        renderStructuredData(ext);
-                    } else {
-                        // Fallback to legacy drug/disease tags
-                        renderDrugs(data.matched_drugs || []);
-                        renderDiseases(data.matched_diseases || []);
-                    }
-
-                    renderCorrections(data.corrections || []);
-                } catch (e) {
-                    console.warn('Could not parse htepResponse:', e);
-                }
-            }
-
-            // --- Toggles ---
             setupToggle('correctionsToggle', 'correctionsBody');
             setupToggle('rawTextToggle', 'rawTextBody');
+            setExpanded('rawTextToggle', 'rawTextBody', false);
 
-            // --- Copy ---
-            const copyBtn = document.getElementById('copyBtn');
-            if (copyBtn) copyBtn.addEventListener('click', copyText);
+            document.getElementById('addMedicineBtn').addEventListener('click', () => {
+                const row = addMedicineRow({});
+                row.querySelector('input').focus();
+            });
+            document.getElementById('exportJsonBtn').addEventListener('click', exportJson);
+            document.getElementById('exportCsvBtn').addEventListener('click', exportCsv);
+            document.getElementById('printBtn').addEventListener('click', () => window.print());
         });
 
-        function hasUsefulData(ext) {
-            // Check if any meaningful field has actual data
-            if (ext.patient_name || ext.doctor_name || ext.hospital || ext.age || ext.gender || ext.date) return true;
-            if (ext.diagnosis && ext.diagnosis.length > 0) return true;
-            if (ext.medicines && ext.medicines.length > 0) return true;
-            if (ext.vitals && Object.keys(ext.vitals).length > 0) return true;
-            if (ext.instructions && ext.instructions.length > 0) return true;
-            return false;
+        /* ---------- Form ---------- */
+
+        function field(name) {
+            return document.querySelector('#rxForm [name="' + name + '"]');
+        }
+
+        function fillForm(data) {
+            const ext = data.extracted_data || {};
+            const sources = data.field_sources || {};
+
+            SCALAR_FIELDS.forEach(f => {
+                field(f).value = ext[f] || '';
+                markSource(field(f).closest('.field'), sources[f]);
+            });
+            ['diagnosis', 'instructions'].forEach(f => {
+                field(f).value = (ext[f] || []).join('\n');
+                markSource(field(f).closest('.field'), sources[f]);
+            });
+            VITAL_FIELDS.forEach(f => { field('vitals.' + f).value = (ext.vitals || {})[f] || ''; });
+
+            let medicines = ext.medicines || [];
+            if (!medicines.length && data.matched_drugs) {
+                // Older responses: dictionary matches only, no structured medicines
+                medicines = data.matched_drugs.map(name => ({ name }));
+            }
+            medicines.forEach(addMedicineRow);
+            if (!medicines.length) addMedicineRow({});
+
+            updateReviewBanner();
+        }
+
+        // Badge a field read by the AI model. Unverified ones need a person to confirm.
+        function markSource(container, meta) {
+            if (!container || !meta || !String(meta.source).includes('vlm')) return;
+            const badge = document.createElement('button');
+            badge.type = 'button';
+            if (meta.verified) {
+                badge.className = 'badge badge-ai';
+                badge.textContent = 'AI-read';
+                badge.title = 'Read by the AI model and found in the scanned text';
+                badge.disabled = true;
+            } else {
+                container.classList.add('needs-review');
+                badge.className = 'badge badge-review';
+                badge.textContent = 'Check';
+                badge.title = 'Not found in the scanned text. Click once you have checked it against the original.';
+                badge.addEventListener('click', () => {
+                    container.classList.remove('needs-review');
+                    badge.className = 'badge badge-ok';
+                    badge.textContent = 'Checked';
+                    badge.disabled = true;
+                    updateReviewBanner();
+                });
+            }
+            (container.querySelector('.label') || container).appendChild(badge);
+        }
+
+        function addMedicineRow(m) {
+            const tr = document.createElement('tr');
+            tr.className = 'field';
+            ['name', 'dosage', 'frequency', 'duration'].forEach(key => {
+                const td = document.createElement('td');
+                const input = document.createElement('input');
+                input.name = key;
+                input.value = m[key] || '';
+                input.setAttribute('aria-label', key === 'name' ? 'Medicine' : key);
+                td.appendChild(input);
+                tr.appendChild(td);
+            });
+
+            const actions = document.createElement('td');
+            actions.className = 'row-actions';
+            const label = document.createElement('span');
+            label.className = 'label';
+            actions.appendChild(label);
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.className = 'icon-btn';
+            remove.setAttribute('aria-label', 'Remove medicine');
+            remove.innerHTML = '<i class="fas fa-trash-can" aria-hidden="true"></i>';
+            remove.addEventListener('click', () => { tr.remove(); updateReviewBanner(); });
+            actions.appendChild(remove);
+            tr.appendChild(actions);
+
+            markSource(tr, m.source ? { source: m.source, verified: m.verified } : null);
+            document.getElementById('medicinesBody').appendChild(tr);
+            return tr;
+        }
+
+        function updateReviewBanner() {
+            const pending = document.querySelectorAll('#rxForm .needs-review').length;
+            document.getElementById('reviewBanner').hidden = pending === 0;
+            document.getElementById('reviewCount').textContent =
+                pending + (pending === 1 ? ' field needs checking. ' : ' fields need checking. ');
+        }
+
+        function collectRecord() {
+            const lines = name => field(name).value.split('\n').map(s => s.trim()).filter(Boolean);
+            const record = {};
+            SCALAR_FIELDS.forEach(f => { record[f] = field(f).value.trim() || null; });
+            record.diagnosis = lines('diagnosis');
+            record.instructions = lines('instructions');
+            record.vitals = {};
+            VITAL_FIELDS.forEach(f => {
+                const v = field('vitals.' + f).value.trim();
+                if (v) record.vitals[f] = v;
+            });
+            record.medicines = [...document.querySelectorAll('#medicinesBody tr')].map(tr => {
+                const get = k => tr.querySelector('[name="' + k + '"]').value.trim() || null;
+                return { name: get('name'), dosage: get('dosage'), frequency: get('frequency'), duration: get('duration') };
+            }).filter(m => m.name);
+            record.source_file = fileName || null;
+            record.exported_at = new Date().toISOString();
+            record.unchecked_fields = document.querySelectorAll('#rxForm .needs-review').length;
+            return record;
+        }
+
+        /* ---------- Export ---------- */
+
+        function download(content, type, extension) {
+            const base = (fileName || 'prescription').replace(/\.[^.]+$/, '');
+            const url = URL.createObjectURL(new Blob([content], { type }));
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = base + '.' + extension;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+
+        function exportJson() {
+            download(JSON.stringify(collectRecord(), null, 2), 'application/json', 'json');
+        }
+
+        // One row per medicine, with the patient details repeated so the file
+        // can be imported into a spreadsheet or pharmacy system as-is.
+        function exportCsv() {
+            const r = collectRecord();
+            const header = SCALAR_FIELDS.concat(['medicine', 'dose', 'frequency', 'duration', 'diagnosis']);
+            const meds = r.medicines.length ? r.medicines : [{}];
+            const rows = meds.map(m => SCALAR_FIELDS.map(f => r[f])
+                .concat([m.name, m.dosage, m.frequency, m.duration, r.diagnosis.join('; ')]));
+            const cell = v => {
+                const s = v == null ? '' : String(v);
+                return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+            };
+            const csv = [header].concat(rows).map(row => row.map(cell).join(',')).join('\r\n');
+            download(csv, 'text/csv', 'csv');
         }
 
         function setExpanded(toggleId, bodyId, expanded) {
@@ -234,7 +379,7 @@
             }
         }
 
-        function renderMeta(classification, timings) {
+        function renderMeta(classification, timings, vlm) {
             const meta = document.getElementById('resultMeta');
             const chips = [];
 
@@ -248,6 +393,10 @@
                 const labels = { routine: 'Routine', high: 'High priority', urgent: 'Urgent' };
                 const icon = urgency === 'routine' ? 'fa-check-circle' : 'fa-triangle-exclamation';
                 chips.push(makeChip('chip-urgency-' + urgency.replace(/[^a-z]/g, ''), icon, labels[urgency] || prettify(urgency)));
+            }
+
+            if (vlm && vlm.used) {
+                chips.push(makeChip('chip-ai', 'fa-wand-magic-sparkles', 'AI reader used'));
             }
 
             if (typeof timings.total === 'number') {
@@ -273,98 +422,6 @@
 
         function prettify(value) {
             return String(value).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-        }
-
-        function renderStructuredData(ext) {
-            document.getElementById('structuredData').style.display = 'block';
-
-            // Patient Info
-            document.getElementById('patName').innerText = ext.patient_name || '-';
-            document.getElementById('patAge').innerText = ext.age || '-';
-            document.getElementById('patGender').innerText = ext.gender || '-';
-            document.getElementById('patDate').innerText = ext.date || '-';
-            document.getElementById('patDoc').innerText = ext.doctor_name || '-';
-            document.getElementById('patHosp').innerText = ext.hospital || '-';
-
-            // Vitals
-            if (ext.vitals && Object.keys(ext.vitals).length > 0) {
-                document.getElementById('vitalsSection').style.display = 'block';
-                document.getElementById('vitBP').innerText = ext.vitals.bp || '-';
-                document.getElementById('vitTemp').innerText = ext.vitals.temp || '-';
-                document.getElementById('vitPulse').innerText = ext.vitals.pulse || '-';
-            }
-
-            // Diagnosis
-            if (ext.diagnosis && ext.diagnosis.length > 0) {
-                const diagSec = document.getElementById('diagnosisSection');
-                const diagCont = document.getElementById('diagnosisTags');
-                diagSec.style.display = 'block';
-                ext.diagnosis.forEach(d => {
-                    const tag = document.createElement('span');
-                    tag.className = 'tag tag-disease';
-                    tag.innerHTML = '<i class="fas fa-stethoscope"></i> ' + escapeHtml(d);
-                    diagCont.appendChild(tag);
-                });
-            }
-
-            // Medicines
-            if (ext.medicines && ext.medicines.length > 0) {
-                const medSec = document.getElementById('medicinesSection');
-                const medBody = document.getElementById('medicinesBody');
-                medSec.style.display = 'block';
-                ext.medicines.forEach(m => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td><strong>${escapeHtml(m.name || '-')}</strong></td>
-                        <td>${escapeHtml(m.dosage || '-')}</td>
-                        <td>${escapeHtml(m.frequency || '-')}</td>
-                    `;
-                    medBody.appendChild(tr);
-                });
-            }
-
-            // Instructions
-            if (ext.instructions && ext.instructions.length > 0) {
-                const instSec = document.getElementById('instructionsSection');
-                const instList = document.getElementById('instructionsList');
-                instSec.style.display = 'block';
-                ext.instructions.forEach(i => {
-                    const li = document.createElement('li');
-                    li.innerText = i;
-                    instList.appendChild(li);
-                });
-            }
-
-            // Collapse raw text by default if structured data exists
-            setExpanded('rawTextToggle', 'rawTextBody', false);
-        }
-
-        // Legacy functions kept for fallback
-        function renderDrugs(drugs) {
-            if (!drugs || drugs.length === 0) return;
-            document.getElementById('structuredData').style.display = 'block';
-            const medSec = document.getElementById('medicinesSection');
-            const medBody = document.getElementById('medicinesBody');
-            medSec.style.display = 'block';
-            drugs.forEach(d => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `<td><strong>${escapeHtml(d)}</strong></td><td>-</td><td>-</td>`;
-                medBody.appendChild(tr);
-            });
-        }
-
-        function renderDiseases(diseases) {
-            if (!diseases || diseases.length === 0) return;
-            document.getElementById('structuredData').style.display = 'block';
-            const diagSec = document.getElementById('diagnosisSection');
-            const diagCont = document.getElementById('diagnosisTags');
-            diagSec.style.display = 'block';
-            diseases.forEach(d => {
-                const tag = document.createElement('span');
-                tag.className = 'tag tag-disease';
-                tag.innerHTML = '<i class="fas fa-stethoscope"></i> ' + escapeHtml(d);
-                diagCont.appendChild(tag);
-            });
         }
 
         function renderCorrections(corrections) {
@@ -402,17 +459,6 @@
             return div.innerHTML;
         }
 
-        function copyText() {
-            const text = document.getElementById('displayText').textContent;
-            const label = document.querySelector('#copyBtn span');
-            navigator.clipboard.writeText(text).then(() => {
-                if (!label) return;
-                label.textContent = 'Copied!';
-                setTimeout(() => { label.textContent = 'Copy text'; }, 1800);
-            }).catch(() => {
-                if (label) label.textContent = 'Copy failed';
-            });
-        }
     </script>
 </body>
 </html>

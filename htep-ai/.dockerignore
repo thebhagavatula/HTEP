@@ -23,6 +23,15 @@ data/fonts/
 tests/
 scripts/
 
+# Research code and models that the server does not load
+# (handwriting ICR, segmentation, training data)
+src/icr/
+src/recognition/
+src/segmentation/
+models/
+data/datasets/
+data/icr_training/
+
 # Development-only files
 *.log
 *.tmp

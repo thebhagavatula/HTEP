@@ -35,7 +35,8 @@ FREQUENCY_PATTERN = re.compile(
     r'|at\s+(?:bedtime|night)'
     r'|every\s+\d+\s+hours?'
     r'|[01]\s*-\s*[01]\s*-\s*[01]'
-    r'|daily|bid|tid|qid|qds|tds|bd|od|hs|sos|prn|stat|morning|night)\b',
+    r'|daily|bid|tid|qid|qds|tds|bd|od|hs|sos|prn|stat|morning|night'
+    r'|once|twice|thrice)\b',
     re.IGNORECASE,
 )
 
@@ -113,9 +114,10 @@ class MedicalDocExtractor:
             data["date"] = date_match.group(1)
 
         # Patient Name: e.g., Patient: John Doe, Name: Jane Smith
-        # Allows initials/apostrophes ("Mr. K. Suresh", "O'Brien") and drops the honorific
+        # Allows initials/apostrophes ("Mr. K. Suresh", "O'Brien") and drops the honorific.
+        # The label tolerates OCR slips on handwriting: "Patieut's neme", "Namu".
         name_match = re.search(
-            r"(?:Patient(?:'s)?\s*Name|Patient|Name)\s*[:\-]\s*(?:(?:Mr|Mrs|Ms|Miss|Master|Baby)\.?\s+)?"
+            r"\b(?:Pat\w*(?:'s)?\s*N[a-z]m[a-z]|Patient|N[a-z]me)\s*[:\-]\s*(?:(?:Mr|Mrs|Ms|Miss|Master|Baby)\.?\s+)?"
             r"([A-Za-z][A-Za-z.'\- \t]*?)(?=[ \t]*(?:\n|,|$)|\s+(?:Age|DOB|Date|Gender|Sex|Diagnosis|Rx|BP|ID|UHID|Mobile)\b)",
             text,
             re.IGNORECASE | re.MULTILINE,
@@ -129,7 +131,8 @@ class MedicalDocExtractor:
         # Name parts may be joined by "." with no space: "Dr.S.MUTHU". A
         # self-referral ("Ref.by : Dr.SELF") is skipped in favour of the next doctor.
         for doc_match in re.finditer(
-            r"(?<![A-Za-z])(?:(?i:Doctor|Physician|Consultant)\s*[:\-]\s*(?:(?i:Dr)\.?\s*)?|(?i:Dr)\.?\s*)"
+            # "Dn." is a common OCR misreading of "Dr." on handwriting
+            r"(?<![A-Za-z])(?:(?i:Doctor|Physician|Consultant)\s*[:\-]\s*(?:(?i:Dr)\.?\s*)?|(?i:Dr\.?|Dn\.)\s*)"
             r"([A-Z][A-Za-z'\-]*(?:(?:\.[ \t]*|[ \t]+)[A-Z][A-Za-z'\-]*){0,3}\.?)",
             text,
         ):
@@ -155,9 +158,12 @@ class MedicalDocExtractor:
                 data["hospital"] = hosp_line.group(1).strip()
 
         # Age/Gender
-        # Combined label first: "Age/Sex : 21.0Yrs/Male", "Age/Gender: 45 Y / F"
+        # Combined label first: "Age/Sex : 21.0Yrs/Male", "Age/Gender: 45 Y / F".
+        # OCR often reads the "/" as "l" or "1" ("Agelsex", "601F" for 60/F),
+        # so the age digits are matched lazily before the separator.
         age_sex = re.search(
-            r'Age\s*/\s*(?:Sex|Gender)\s*[:\-]?\s*(\d{1,3})(?:\.\d+)?\s*(?:Y(?:rs?|ears?)?\.?)?\s*/\s*(Male|Female|M|F)\b',
+            r'Age\s*[/l1|]\s*(?:Sex|Gender|Se[a-z])\s*[:\-]?\s*(\d{1,3}?)(?:\.\d+)?\s*(?:Y(?:rs?|ears?)?\.?)?'
+            r'\s*[/l1|]\s*(Male|Female|M|F)\b',
             text, re.IGNORECASE,
         )
         age_match = re.search(r'(?:Age)\s*[:\-]\s*(\d+)', text, re.IGNORECASE)
@@ -185,7 +191,8 @@ class MedicalDocExtractor:
             data["vitals"]["pulse"] = pulse_match.group(1)
 
         # Diagnosis (Regex heuristic: looking for keywords near 'Diagnosis' or known diseases)
-        diag_match = re.search(r'(?:Diagnosis|Assessment|Impression)\s*[:\-]\s*([^\n]+(?:\n\s*[\-\*o\d\.]+\s+[^\n]+)*)', text, re.IGNORECASE)
+        # Tolerates "Diagnosis (s):" and "Diaguosis." from handwriting OCR
+        diag_match = re.search(r'(?:Dia[gq][a-z]*sis|Assessment|Impression)(?:\s*\([^)\n]{0,3}\))?\s*[:\-.]\s*([^\n]+(?:\n\s*[\-\*o\d\.]+\s+[^\n]+)*)', text, re.IGNORECASE)
         if diag_match:
             # Split by commas or newlines with bullets
             items = re.split(r',| and |\n', diag_match.group(1))
@@ -216,7 +223,7 @@ class MedicalDocExtractor:
                     seen.add(med_info["name"].lower())
 
         # Instructions
-        inst_match = re.search(r'(?:Instructions?|Advice|Plan|Follow up)\s*[:\-]\s*(.*)', text, re.IGNORECASE | re.DOTALL)
+        inst_match = re.search(r'(?:Instructions?|Advice|Plan|Follow up)\s*[:\-.]\s*(.*)', text, re.IGNORECASE | re.DOTALL)
         if inst_match:
             inst_text = inst_match.group(1)
             lines = [l.strip() for l in inst_text.split('\n') if l.strip()]
@@ -243,6 +250,8 @@ class MedicalDocExtractor:
         # Clean up name
         name = re.sub(r'^[\-\*o\d\.]+\s*', '', name).strip() # Remove bullets/numbering
         name = DOSAGE_FORM_PREFIX.sub('', name).strip()  # Remove "Tab." / "Cap." etc.
+        # "DICLOFENAC SODIUM - 50mg orally" when the dose is unreadable: keep the name part
+        name = re.split(r'\s+-\s+', name)[0].strip()
 
         if len(name) > 2:
             return {
@@ -341,6 +350,12 @@ class MedicalDocExtractor:
 
         # OCR sometimes emits the full-width colon "：" used in Asian fonts
         text = text.replace("：", ":")
+        # ...and the letter O for a zero inside doses: "1Omg" -> "10mg"
+        text = re.sub(
+            r'\b(\d[\dOo]*)(\s*(?:mg|mcg|ml|g)\b)',
+            lambda m: m.group(1).replace("O", "0").replace("o", "0") + m.group(2),
+            text,
+        )
 
         # 1. Run all layers
         regex_data = self._extract_with_regex(text)

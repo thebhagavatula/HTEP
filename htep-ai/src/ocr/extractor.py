@@ -55,13 +55,25 @@ class OCRExtractor:
         self.engine_name = OCR_ENGINE
 
         if self.engine_name == "rapid":
-            from rapidocr import RapidOCR
+            from rapidocr import LangRec, ModelType, OCRVersion, RapidOCR
 
-            # RapidOCR's default PP-OCRv6 small models (~31 MB) on ONNX Runtime:
-            # no PaddlePaddle install, ~10x faster on CPU, and on
-            # tests/ground_truth.json a lower CER (0.92%) than the PaddleOCR
-            # server models (1.45%).
-            self._rapid = RapidOCR(params={"Global.use_cls": False})
+            # PP-OCRv6 small detection + the English PP-OCRv5 mobile recognizer
+            # (the one PaddleOCR used with lang="en") on ONNX Runtime: no
+            # PaddlePaddle install and several times faster on CPU. On
+            # tests/ground_truth.json the CER is 0.63% (PaddleOCR: 1.45%). The
+            # default multilingual recognizer scored 0.92% there but misread
+            # labels on real handwriting ("neme", "601F"), so it is not used.
+            self._rapid = RapidOCR(params={
+                "Global.use_cls": False,
+                "Rec.lang_type": LangRec.EN,
+                "Rec.ocr_version": OCRVersion.PPOCRV5,
+                "Rec.model_type": ModelType.MOBILE,
+            })
+            # Models load on first use; load them now so the first upload
+            # doesn't pay for it.
+            warmup = np.full((48, 160, 3), 255, dtype=np.uint8)
+            cv2.putText(warmup, "Rx 10mg", (5, 32), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2)
+            self._rapid(warmup)
 
         elif self.engine_name == "paddle":
             from paddleocr import PaddleOCR

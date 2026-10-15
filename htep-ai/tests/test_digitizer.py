@@ -179,3 +179,19 @@ def test_rejects_unsupported_file_type(client):
     test_client, _ = client
     resp = test_client.post("/jobs", data={"file": (io.BytesIO(b"x"), "notes.docx")})
     assert resp.status_code == 400
+
+
+# ---------------------------------------------------------------- OCR noise
+
+def test_rules_tolerate_handwriting_ocr_slips():
+    # Real RapidOCR output of a handwritten prescription
+    text = ("Patient's neme: Neetu verma\nAge/sex\n601F\nDiagnosis (s): Aspirin induced\n"
+            "2) Tab DICLOFENAC SODIUM - SOmg orally thrice\nADVICE:\nAvoid spicy food\n"
+            "Dn. Haya Abdi\n- Budesonide 1Omg twice daily")
+    data = MedicalDocExtractor([], []).extract(text)
+    assert data["patient_name"] == "Neetu verma"
+    assert (data["age"], data["gender"]) == ("60", "Female")
+    assert data["diagnosis"] == ["Aspirin induced"]
+    assert data["instructions"][0] == "Avoid spicy food"
+    assert data["doctor_name"] == "Dr. Haya Abdi"
+    assert {"name": "DICLOFENAC SODIUM", "dosage": None, "frequency": "thrice", "duration": None} in data["medicines"]

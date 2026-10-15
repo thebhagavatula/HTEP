@@ -18,11 +18,11 @@ WORKDIR $HOME/app
 COPY --chown=user requirements-deploy.txt constraints-deploy.txt ./
 RUN pip install --no-cache-dir -r requirements-deploy.txt -c constraints-deploy.txt
 
-# Download the OCR models at build time so a cold start doesn't fetch them
-RUN python -c "from rapidocr import RapidOCR; RapidOCR(params={'Global.use_cls': False})"
-
 # Copy project files
 COPY --chown=user . .
+
+# Download the OCR models at build time so a cold start doesn't fetch them
+RUN python -c "from src.ocr.extractor import OCRExtractor; OCRExtractor()"
 
 # Ensure data directories exist
 RUN mkdir -p data/raw data/processed data/dictionaries

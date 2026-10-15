@@ -28,7 +28,7 @@ scripts/
 src/icr/
 src/recognition/
 src/segmentation/
-models/
+models/icr_block/
 data/datasets/
 data/icr_training/
 

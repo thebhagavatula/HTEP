@@ -251,7 +251,7 @@ class MedicalDocExtractor:
         name = re.sub(r'^[\-\*o\d\.]+\s*', '', name).strip() # Remove bullets/numbering
         name = DOSAGE_FORM_PREFIX.sub('', name).strip()  # Remove "Tab." / "Cap." etc.
         # "DICLOFENAC SODIUM - 50mg orally" when the dose is unreadable: keep the name part
-        name = re.split(r'\s+-\s+', name)[0].strip()
+        name = re.split(r'\s+-', name)[0].strip()
 
         if len(name) > 2:
             return {

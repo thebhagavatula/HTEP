@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Dict, List
 import cv2
 import numpy as np
-from pdf2image import convert_from_path, pdfinfo_from_path
+import pypdfium2 as pdfium
 
 # PaddleX's default text detection only enforces a *minimum* side (64px) and
 # lets images up to 4000px through at full size. On a 12 MP phone photo or a
@@ -28,11 +28,37 @@ from pdf2image import convert_from_path, pdfinfo_from_path
 # text crops from the full-resolution image.
 DET_MAX_SIDE = 1600
 
-# Import config toggle
-try:
-    from src.config import OCR_ENGINE
-except ImportError:
-    OCR_ENGINE = "rapid"  # default if not set in config
+from src.config import MAX_PDF_PAGES, OCR_DET_MODEL_PATH, OCR_ENGINE, OCR_REC_MODEL_PATH
+
+
+class DocumentTooLargeError(ValueError):
+    """The upload is over a processing limit, e.g. too many PDF pages."""
+
+
+def render_pdf_pages(pdf_path, dpi: int = 200, first_n: int = None):
+    """Yield the PDF's pages as BGR images, one at a time to keep memory flat.
+
+    pypdfium2 is a self-contained wheel; pdf2image needed the Poppler program,
+    which serverless hosts such as Vercel don't have.
+    """
+    pdf = pdfium.PdfDocument(str(pdf_path))
+    try:
+        count = len(pdf) if first_n is None else min(first_n, len(pdf))
+        for i in range(count):
+            page = pdf[i]
+            image = page.render(scale=dpi / 72).to_pil().convert("RGB")
+            page.close()
+            yield cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+    finally:
+        pdf.close()
+
+
+def pdf_page_count(pdf_path) -> int:
+    pdf = pdfium.PdfDocument(str(pdf_path))
+    try:
+        return len(pdf)
+    finally:
+        pdf.close()
 
 
 @dataclass
@@ -63,8 +89,13 @@ class OCRExtractor:
             # tests/ground_truth.json the CER is 0.63% (PaddleOCR: 1.45%). The
             # default multilingual recognizer scored 0.92% there but misread
             # labels on real handwriting ("neme", "601F"), so it is not used.
+            # The models are committed under models/ocr/ and loaded by path:
+            # RapidOCR would otherwise download them into its package folder,
+            # which is read-only on serverless hosts.
             self._rapid = RapidOCR(params={
                 "Global.use_cls": False,
+                "Det.model_path": str(OCR_DET_MODEL_PATH),
+                "Rec.model_path": str(OCR_REC_MODEL_PATH),
                 "Rec.lang_type": LangRec.EN,
                 "Rec.ocr_version": OCRVersion.PPOCRV5,
                 "Rec.model_type": ModelType.MOBILE,
@@ -165,17 +196,13 @@ class OCRExtractor:
 
     def read_pdf(self, pdf_path: str, dpi: int = 200) -> List[OCRPage]:
         # 200 DPI reads the same text as 300 DPI on our samples, faster and in less memory
-        # Render one page at a time so multi-page PDFs don't hold every
-        # rendered page (~12 MB each at 200 DPI) in memory at once.
-        page_count = pdfinfo_from_path(str(pdf_path))["Pages"]
-
-        pages = []
-        for i in range(1, page_count + 1):
-            page_img = convert_from_path(str(pdf_path), dpi=dpi, first_page=i, last_page=i)[0]
-            page_array = cv2.cvtColor(np.array(page_img), cv2.COLOR_RGB2BGR)
-            pages.append(self._ocr_page(page_array))
-
-        return pages
+        page_count = pdf_page_count(pdf_path)
+        if page_count > MAX_PDF_PAGES:
+            raise DocumentTooLargeError(
+                f"This PDF has {page_count} pages; the limit is {MAX_PDF_PAGES}. "
+                "Upload the prescription pages only."
+            )
+        return [self._ocr_page(image) for image in render_pdf_pages(pdf_path, dpi)]
 
     def extract_from_image(self, image_path: str) -> str:
         """Plain-text OCR of an image (used by the evaluation scripts)."""

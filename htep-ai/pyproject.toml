@@ -1,0 +1,26 @@
+[project]
+name = "htep"
+version = "3.0.0"
+description = "Prescription digitizer: OCR + rule-based extraction with an optional, grounded vision model"
+requires-python = ">=3.12"
+# The single list of runtime dependencies, used by Vercel and the Dockerfile.
+# constraints-deploy.txt pins the full tree. No PaddlePaddle, TensorFlow or
+# spaCy: OCR runs PP-OCR models on ONNX Runtime. The research stack lives in
+# requirements-research.txt.
+dependencies = [
+    "Flask==3.1.3",
+    "Flask-Cors==6.0.5",
+    "psutil==7.2.2",
+    "python-dotenv==1.2.4",
+    "rapidocr==3.10.0",
+    "onnxruntime==1.31.0",
+    "opencv-python-headless==5.0.0.93",
+    "numpy==2.5.4",
+    "pypdfium2==5.14.0",
+    "Pillow==12.3.0",
+    "RapidFuzz==3.14.6",
+]
+
+[tool.vercel]
+# The whole Flask app is deployed as one Vercel Function
+entrypoint = "app.api:app"

@@ -26,7 +26,7 @@ from src.config import VLM_MIN_OCR_CONFIDENCE, VLM_MODE
 from src.nlp.classifier import MedicalDocumentClassifier
 from src.nlp.medical_extractor import MedicalDocExtractor
 from src.nlp.ocr_postprocessor import OCRPostProcessor
-from src.ocr.extractor import OCRExtractor, OCRPage
+from src.ocr.extractor import OCRExtractor, OCRPage, render_pdf_pages
 from src.pipeline.grounding import is_grounded
 from src.vlm.client import VLMClient
 
@@ -125,10 +125,7 @@ class Digitizer:
     def _first_page_image(self, file_path: Path):
         if file_path.suffix.lower() in IMAGE_SUFFIXES:
             return cv2.imread(str(file_path))
-        from pdf2image import convert_from_path
-        import numpy as np
-        page = convert_from_path(str(file_path), dpi=150, first_page=1, last_page=1)[0]
-        return cv2.cvtColor(np.array(page), cv2.COLOR_RGB2BGR)
+        return next(render_pdf_pages(file_path, dpi=150, first_n=1), None)
 
     def _classify(self, text: str) -> Dict[str, Any]:
         if not text:

@@ -2,24 +2,15 @@
    BACKEND CONFIG
 =============================== */
 
-// Production backend: local machine via Cloudflare quick tunnel (GCP billing is off;
-// Cloud Run was https://htep-151629903010.us-central1.run.app). To point the frontend
-// elsewhere, set window.HTEP_API_BASE before this script loads.
-const HTEP_BACKEND_URL = 'https://identification-screening-makeup-divide.trycloudflare.com';
-
+// The API is served from the same address as the site: by Vercel in
+// production and by Flask in local development. To use another backend, set
+// window.HTEP_API_BASE before this script loads.
 function getApiBase() {
-    if (window.HTEP_API_BASE) return window.HTEP_API_BASE;
-
-    const host = window.location.hostname;
-    if (host === 'localhost' || host === '127.0.0.1') return 'http://127.0.0.1:5000';
-
-    // Frontend served by the backend itself (Cloud Run also serves /web)
-    if (host.endsWith('.run.app')) return window.location.origin;
-
-    return HTEP_BACKEND_URL;
+    return window.HTEP_API_BASE || '';
 }
 
-const MAX_FILE_BYTES = 5 * 1024 * 1024;
+// The free hosting plan accepts request bodies up to 4.5 MB
+const MAX_FILE_BYTES = 4 * 1024 * 1024;
 const ACCEPTED_EXTENSIONS = ['pdf', 'png', 'jpg', 'jpeg'];
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -120,7 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (file.size > MAX_FILE_BYTES) {
             resetSelection();
-            setStatus(`That file is ${formatBytes(file.size)}. Please upload a file under 5 MB.`, true);
+            setStatus(`That file is ${formatBytes(file.size)}. Please upload a file under 4 MB.`, true);
             return;
         }
 
@@ -192,14 +183,14 @@ document.addEventListener('DOMContentLoaded', () => {
             await warmup;
             clearInterval(ticker);
 
-            // Abort just after Cloud Run's 600s request timeout so the server's limit governs
+            // Abort just after the host's 300 s request limit so the server's limit governs
             const controller = new AbortController();
-            timeoutId = setTimeout(() => controller.abort(), 10 * 60 * 1000);
+            timeoutId = setTimeout(() => controller.abort(), 310 * 1000);
 
             tick('Reading your prescription…');
             ticker = setInterval(() => { elapsed++; tick('Reading your prescription…'); }, 1000);
 
-            const response = await fetch(getApiBase() + '/jobs', {
+            const response = await fetch(getApiBase() + '/api/digitize', {
                 method: 'POST',
                 body: formData,
                 signal: controller.signal
@@ -207,8 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!response.ok) throw new Error(await serverError(response));
 
-            const { job_id } = await response.json();
-            const data = await pollJob(job_id, controller.signal);
+            const data = await response.json();
             clearTimeout(timeoutId);
             clearInterval(ticker);
 
@@ -252,33 +242,6 @@ async function serverError(response) {
     return message;
 }
 
-// A multi-page PDF can take minutes, longer than proxies such as Cloudflare
-// tunnels (100s) keep a request open, so the server processes the file in the
-// background and we poll for the result.
-async function pollJob(jobId, signal) {
-    let failures = 0;
-    while (true) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
-
-        let res;
-        try {
-            res = await fetch(getApiBase() + '/jobs/' + jobId, { signal });
-        } catch (err) {
-            // Ride out brief network blips; give up after ~10s of failures
-            if (err.name === 'AbortError' || ++failures > 5) throw err;
-            continue;
-        }
-        if (res.status >= 500 && ++failures <= 5) continue;
-        if (!res.ok) throw new Error(await serverError(res));
-        failures = 0;
-
-        const job = await res.json();
-        if (job.status === 'done') return job.result;
-        if (job.status === 'error') throw new Error(job.error || 'Processing failed');
-    }
-}
-
 /* ===============================
    BACKEND WARM-UP / STATUS PILL
 =============================== */
@@ -299,7 +262,7 @@ async function warmUpBackend() {
     const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000);
 
     try {
-        const res = await fetch(getApiBase() + '/status', { signal: controller.signal });
+        const res = await fetch(getApiBase() + '/api/status', { signal: controller.signal });
         if (!res.ok) throw new Error('Status ' + res.status);
         setState('ready', 'Extraction engine ready');
     } catch (err) {

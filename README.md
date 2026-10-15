@@ -38,29 +38,34 @@ should always check the record against the original.
 
 ```
 htep-ai/
-  app/api.py              Flask API: /jobs (async), /upload (sync), /status
+  app/api.py              Flask API: POST /api/digitize, GET /api/status
   src/pipeline/           digitizer.py (orchestration), grounding.py
   src/ocr/extractor.py    OCR engines: rapid (default), paddle, tesseract
   src/nlp/                field extraction, dictionary correction, classifier
   src/vlm/client.py       VLM client (Ollama or OpenAI-compatible API)
-  web/                    static frontend (deployed to Vercel)
+  public/                 static frontend (served by Vercel's CDN)
+  models/ocr/             the two ONNX OCR models (committed; ~18 MB)
+  pyproject.toml          runtime dependencies + Vercel entrypoint
+  vercel.json             function limits (300 s) and bundle exclusions
   tests/test_digitizer.py pipeline, grounding and API tests
-  src/icr, src/recognition, src/segmentation, models/
+  src/icr, src/recognition, src/segmentation, models/icr_block/,
+  requirements-research.txt
                           research: handwriting ICR experiments, not used by the server
 ```
 
 ## Run locally
 
-Python 3.12. PDF support needs Poppler (`poppler-utils` on Linux, or the
-Windows build on `PATH`).
+Python 3.12. PDFs are rendered by pypdfium2, so no system packages are needed.
 
 ```bash
 cd htep-ai
 python -m venv .venv
 .venv/Scripts/activate          # Linux/macOS: source .venv/bin/activate
-pip install -r requirements-deploy.txt -c constraints-deploy.txt
+pip install flask flask-cors psutil python-dotenv rapidocr onnxruntime opencv-python-headless numpy pypdfium2 pillow rapidfuzz -c constraints-deploy.txt
 python -c "from app.api import app; app.run(port=5000)"
 ```
+
+(The package list is `[project].dependencies` in `pyproject.toml`.)
 
 Open <http://127.0.0.1:5000>. To digitize one file from the command line:
 `python main.py path/to/prescription.jpg`.
@@ -93,27 +98,43 @@ vllm serve Qwen/Qwen2.5-VL-7B-Instruct --max-model-len 8192
 
 ## Deploy
 
-- **Backend:** `htep-ai/Dockerfile` (Python 3.12, about 300 MB of Python
-  packages). One instance with **1 GiB** of memory is enough: it peaked at
-  about 650 MB on a 2-page PDF. It runs on Cloud Run, Render (a paid instance;
-  the free 512 MB plan is too small) or any Docker host.
-- **Frontend:** `htep-ai/web` on Vercel. Point `HTEP_BACKEND_URL` in
-  `web/app.js` at the backend.
+The site and the API run in one Vercel project on the free Hobby plan, which
+has no payment method, so hosting costs $0 and nothing runs on a personal
+computer.
+
+- Vercel project settings: **Root Directory = `htep-ai`**. Vercel reads
+  `pyproject.toml` (dependencies, and `app.api:app` as the entrypoint) and
+  `vercel.json` (300 s limit, files kept out of the bundle).
+- `public/` is served from Vercel's CDN; `/api/*` runs in one Python Function
+  (2 GB, 1 vCPU). Pushing to `main` deploys both.
+- Limits that keep a request on the free plan: 4 MB uploads (Vercel accepts
+  4.5 MB), 10 PDF pages. Hobby allows 4 active-CPU hours a month, roughly
+  3,600 to 7,200 single-page documents.
+- Measured: bundle about 375 MB of the 500 MB allowed, cold start about 2 s,
+  peak memory about 650 MB.
+- Hobby is for personal, non-commercial use. A commercial launch needs either
+  a paid plan or phase 2 (OCR in the browser).
+- `htep-ai/Dockerfile` still builds a container for any other host.
 
 ## Measured on `tests/ground_truth.json` (37 documents)
 
 | | Before (PaddleOCR + TensorFlow + LLaVA) | Now (RapidOCR) |
 |---|---|---|
-| Character error rate | 1.45% | 0.92% |
-| Time per image (CPU) | ~18 s | 1.6 s |
-| Engine start-up | ~110 s | under 1 s |
+| Character error rate | 1.45% | 0.63% |
+| Time per image (CPU) | ~18 s | ~1.5–2 s |
+| Engine start-up | ~110 s | ~2 s |
 | Peak memory | 2.5 to 4.7 GB | about 650 MB |
 
 ## Roadmap
 
-1. **Lab reports:** test, value, unit and reference range, with out-of-range
+1. **On-device vision model (option A):** read handwriting with a small
+   vision model running in the user's browser (WebGPU), checked against the
+   OCR text. $0 and private: the image never leaves the device.
+2. **OCR in the browser:** run the same ONNX models with ONNX Runtime Web, so
+   there is no backend at all.
+3. **Lab reports:** test, value, unit and reference range, with out-of-range
    flags. The classifier already recognizes lab reports; they need their own
    extractor in `src/pipeline/digitizer.py`.
-2. **Personal health records:** a patient's prescriptions and reports over
+4. **Personal health records:** a patient's prescriptions and reports over
    time, with a medicine schedule and lab trends. This needs accounts and
    storage.

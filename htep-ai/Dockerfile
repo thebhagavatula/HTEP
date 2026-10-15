@@ -1,8 +1,8 @@
 FROM python:3.12-slim
 
-# poppler-utils renders PDF pages for OCR
+# libglib2.0-0 is needed by OpenCV; PDFs are rendered by pypdfium2 (no Poppler)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libglib2.0-0 poppler-utils \
+    libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Set up a non-root user
@@ -15,8 +15,9 @@ WORKDIR $HOME/app
 
 # Install Python dependencies first (better Docker cache)
 # constraints-deploy.txt pins the full dependency tree to the last known-good build
-COPY --chown=user requirements-deploy.txt constraints-deploy.txt ./
-RUN pip install --no-cache-dir -r requirements-deploy.txt -c constraints-deploy.txt
+COPY --chown=user pyproject.toml constraints-deploy.txt ./
+RUN python -c "import tomllib; print('\n'.join(tomllib.load(open('pyproject.toml', 'rb'))['project']['dependencies']))" > /tmp/requirements.txt \
+    && pip install --no-cache-dir -r /tmp/requirements.txt gunicorn -c constraints-deploy.txt
 
 # Copy project files
 COPY --chown=user . .

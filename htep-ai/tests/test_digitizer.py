@@ -1,7 +1,7 @@
 # tests/test_digitizer.py
-"""Digitizer, grounding and job API tests. Fake OCR and VLM objects keep these fast."""
+"""Digitizer, grounding and API tests. Fake OCR and VLM objects keep these fast."""
 
-import time
+import io
 
 import pytest
 
@@ -154,31 +154,52 @@ def client(monkeypatch):
     return api.app.test_client(), api
 
 
-def test_job_runs_and_deletes_upload(client, tmp_path, monkeypatch):
+def test_digitize_returns_record_and_deletes_upload(client, tmp_path, monkeypatch):
     test_client, api = client
     monkeypatch.setattr(api, "UPLOAD_DIR", tmp_path)
 
-    import io
-    resp = test_client.post("/jobs", data={"file": (io.BytesIO(b"fake"), "rx.png")})
-    assert resp.status_code == 202
-    job_id = resp.get_json()["job_id"]
-
-    for _ in range(50):
-        job = test_client.get(f"/jobs/{job_id}").get_json()
-        if job["status"] != "pending":
-            break
-        time.sleep(0.05)
-
-    assert job["status"] == "done"
-    assert job["result"]["file"] == "rx.png"
+    resp = test_client.post("/api/digitize", data={"file": (io.BytesIO(b"fake"), "rx.png")})
+    assert resp.status_code == 200
+    assert resp.get_json()["file"] == "rx.png"
     assert list(tmp_path.iterdir()) == []   # upload deleted after processing
 
 
 def test_rejects_unsupported_file_type(client):
-    import io
     test_client, _ = client
-    resp = test_client.post("/jobs", data={"file": (io.BytesIO(b"x"), "notes.docx")})
+    resp = test_client.post("/api/digitize", data={"file": (io.BytesIO(b"x"), "notes.docx")})
     assert resp.status_code == 400
+
+
+def test_rejects_upload_over_size_limit(client):
+    test_client, api = client
+    too_big = io.BytesIO(b"0" * (api.app.config["MAX_CONTENT_LENGTH"] + 1))
+    resp = test_client.post("/api/digitize", data={"file": (too_big, "rx.png")})
+    assert resp.status_code == 413
+    assert "larger than" in resp.get_json()["error"]
+
+
+def test_status_reports_limits(client):
+    test_client, _ = client
+    body = test_client.get("/api/status").get_json()
+    assert body["status"] == "ok" and body["limits"]["max_upload_mb"] == 4
+
+
+def test_pdf_over_page_limit_is_rejected(tmp_path, monkeypatch):
+    import pypdfium2 as pdfium
+    from src.ocr import extractor
+    from src.ocr.extractor import DocumentTooLargeError, OCRExtractor
+
+    pdf = pdfium.PdfDocument.new()
+    for _ in range(3):
+        pdf.new_page(200, 200)
+    path = tmp_path / "long.pdf"
+    pdf.save(str(path))
+    pdf.close()
+
+    monkeypatch.setattr(extractor, "MAX_PDF_PAGES", 2)
+    ocr = OCRExtractor.__new__(OCRExtractor)   # no models needed: it fails before OCR
+    with pytest.raises(DocumentTooLargeError):
+        ocr.read_pdf(str(path))
 
 
 # ---------------------------------------------------------------- OCR noise

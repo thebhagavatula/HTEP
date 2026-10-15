@@ -1,13 +1,21 @@
 # app/api.py
+#
+# One Flask app for both places it runs:
+#   - Vercel: deployed as a single Python Function (see pyproject.toml and
+#     vercel.json); public/ is served by Vercel's CDN.
+#   - Local development: python -c "from app.api import app; app.run()"
+#     also serves public/ itself.
 
 from pathlib import Path
 import sys
+import tempfile
 import threading
 import time
 import traceback
 import uuid
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
+from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.utils import secure_filename
 
 # -------------------------------
@@ -18,13 +26,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
-from src.config import WEB_DIR, RAW_DATA_DIR
+from src.config import MAX_UPLOAD_MB, WEB_DIR
 
-UPLOAD_DIR = RAW_DATA_DIR
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+# The only writable place on serverless hosts. Uploads live here just long
+# enough to be processed, then are deleted.
+UPLOAD_DIR = Path(tempfile.gettempdir()) / "htep-uploads"
 
 ALLOWED_SUFFIXES = {".pdf", ".png", ".jpg", ".jpeg"}
 
+from src.ocr.extractor import DocumentTooLargeError
 from src.pipeline.digitizer import Digitizer
 
 # -------------------------------
@@ -36,14 +46,14 @@ app = Flask(
     static_folder=str(WEB_DIR),
     static_url_path=""
 )
-app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
+app.config["MAX_CONTENT_LENGTH"] = int(MAX_UPLOAD_MB * 1024 * 1024)
 CORS(app)
 
 # -------------------------------
 # LAZY LOAD MODELS
 # -------------------------------
-# Loading the OCR models at import time blocks gunicorn from binding to the
-# port on Cloud Run, causing startup timeouts. We lazy-load them instead.
+# Loading the OCR models at import time would slow every cold start, even for
+# requests that don't need them. The page's status call loads them early.
 
 digitizer = None
 _digitizer_lock = threading.Lock()
@@ -53,7 +63,7 @@ def load_engines():
     if digitizer is not None:
         return
 
-    # Concurrent requests (e.g. the frontend's /status warm-up and an upload)
+    # Concurrent requests (e.g. the frontend's status warm-up and an upload)
     # must not load the models twice: that doubles memory.
     with _digitizer_lock:
         if digitizer is None:
@@ -62,15 +72,13 @@ def load_engines():
             digitizer = Digitizer()
             print(f"Engines initialized in {round(time.time() - t0, 2)}s", flush=True)
 
-print("Backend ready", flush=True)
-
 # -------------------------------
-# WEBSITE ROUTES
+# API ROUTES
 # -------------------------------
 
-@app.route("/status")
+@app.route("/api/status")
 def status():
-    """Health-check endpoint — shows what's loaded."""
+    """Health check; also loads the engines so the first upload is quick."""
     load_engines()
     import psutil
     mem = psutil.Process().memory_info()
@@ -83,21 +91,10 @@ def status():
             "model": vlm.model if vlm.enabled else None,
             "reachable": vlm.is_reachable(),
         },
+        "limits": {"max_upload_mb": MAX_UPLOAD_MB},
         "memory_mb": round(mem.rss / 1024 / 1024, 1),
     })
 
-@app.route("/")
-def index():
-    return send_from_directory(WEB_DIR, "index.html")
-
-
-@app.route("/<path:path>")
-def serve_static(path):
-    return send_from_directory(WEB_DIR, path)
-
-# -------------------------------
-# API ROUTE
-# -------------------------------
 
 def _save_upload():
     """Save the posted file. Returns (file_path, filename) or (None, error_response)."""
@@ -113,6 +110,7 @@ def _save_upload():
         return None, (jsonify({"error": "Upload a PDF, PNG or JPEG file"}), 400)
 
     # A unique name per upload, so two uploads of "scan.jpg" never overwrite each other
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     file_path = UPLOAD_DIR / f"{uuid.uuid4().hex}_{filename}"
     file.save(file_path)
     return file_path, filename
@@ -127,25 +125,32 @@ def _process_file(file_path: Path, filename: str) -> dict:
     load_engines()
     try:
         with _process_lock:
-            print(f"File received: {filename}", flush=True)
             result = digitizer.process(file_path)
     finally:
         file_path.unlink(missing_ok=True)
 
     result["file"] = filename
-    print(f"Processed {filename} in {result['timings']['total']}s "
-          f"(ocr_confidence={result['ocr_confidence']}, vlm={result['vlm']}, "
-          f"review={result['review_required']})", flush=True)
+    # No document text in the logs: it is patient data
+    print(f"Processed a {Path(filename).suffix} file in {result['timings']['total']}s "
+          f"(ocr_confidence={result['ocr_confidence']}, vlm_used={result['vlm']['used']}, "
+          f"fields_to_check={len(result['review_required'])})", flush=True)
     return result
 
 
-@app.route("/upload", methods=["POST"])
-def upload_file():
+@app.route("/api/digitize", methods=["POST"])
+def digitize():
+    """Digitize one prescription. Synchronous: the response is the record."""
     try:
         file_path, filename = _save_upload()
         if file_path is None:
             return filename
         return jsonify(_process_file(file_path, filename))
+
+    except DocumentTooLargeError as e:
+        return jsonify({"error": str(e)}), 413
+
+    except RequestEntityTooLarge:
+        raise  # answered by upload_too_large()
 
     except Exception as e:
         print("ERROR DURING PROCESSING", flush=True)
@@ -154,52 +159,24 @@ def upload_file():
         sys.stderr.flush()
         return jsonify({"error": str(e)}), 500
 
+
+@app.errorhandler(RequestEntityTooLarge)
+def upload_too_large(_e):
+    return jsonify({"error": f"The file is larger than {MAX_UPLOAD_MB:g} MB. "
+                             "Upload a smaller photo or scan."}), 413
+
 # -------------------------------
-# ASYNC JOBS
+# WEBSITE ROUTES (local development; Vercel serves public/ from its CDN)
 # -------------------------------
-# A multi-page PDF can take minutes, longer than proxies such as Cloudflare
-# tunnels (100s) keep a request open. POST /jobs returns at once and the
-# client polls GET /jobs/<id> for the result.
 
-JOB_TTL_S = 3600
-_jobs = {}
-_jobs_lock = threading.Lock()
+@app.route("/")
+def index():
+    return send_from_directory(WEB_DIR, "index.html")
 
-def _run_job(job_id: str, file_path: Path, filename: str):
-    try:
-        update = {"status": "done", "result": _process_file(file_path, filename)}
-    except Exception as e:
-        print("ERROR DURING PROCESSING", flush=True)
-        traceback.print_exc()
-        update = {"status": "error", "error": str(e)}
-    with _jobs_lock:
-        _jobs[job_id].update(update)
 
-@app.route("/jobs", methods=["POST"])
-def create_job():
-    file_path, filename = _save_upload()
-    if file_path is None:
-        return filename
-
-    job_id = uuid.uuid4().hex
-    now = time.time()
-    with _jobs_lock:
-        for old in [k for k, j in _jobs.items()
-                    if j["status"] != "pending" and now - j["created"] > JOB_TTL_S]:
-            del _jobs[old]
-        _jobs[job_id] = {"status": "pending", "created": now}
-
-    threading.Thread(target=_run_job, args=(job_id, file_path, filename), daemon=True).start()
-    return jsonify({"job_id": job_id}), 202
-
-@app.route("/jobs/<job_id>")
-def get_job(job_id):
-    with _jobs_lock:
-        job = _jobs.get(job_id)
-        if job is None:
-            return jsonify({"error": "Unknown job — the server may have restarted"}), 404
-        body = {k: v for k, v in job.items() if k != "created"}
-    return jsonify(body)
+@app.route("/<path:path>")
+def serve_static(path):
+    return send_from_directory(WEB_DIR, path)
 
 # -------------------------------
 # RUN

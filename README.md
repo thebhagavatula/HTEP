@@ -1,9 +1,10 @@
 # HTEP: Prescription Digitizer
 
-HTEP turns a photo or scan of a prescription into an editable, checked digital
-record: patient and doctor details, diagnosis, and a medicine list with dose,
-frequency and duration. Staff check the highlighted fields and export the
-record as CSV or JSON, or print it.
+HTEP turns a photo or scan of a prescription into a structured digital record:
+patient and doctor details, diagnosis, and a medicine list with dose, frequency
+and duration. The record shows exactly what was extracted and cannot be edited
+on the page; fields that need a closer look are highlighted. It can be
+exported as CSV or JSON, or printed.
 
 Live site: <https://htep-ai.vercel.app>
 
@@ -107,7 +108,7 @@ AI**:
 2. The browser sends only the model's JSON answer, the current form and the
    OCR text to `POST /api/merge`, which applies the same grounding rules as
    the server: AI values only fill empty fields, and any value not found in
-   the OCR text is marked **Check**. Edits the user already made are kept.
+   the OCR text is marked **Check**.
 
 It needs a browser with WebGPU (a recent Chrome or Edge on a computer); other
 browsers keep the OCR-only result.

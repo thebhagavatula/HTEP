@@ -44,7 +44,7 @@
         <header class="results-header">
             <div>
                 <h1>Prescription Review</h1>
-                <p class="subtitle" id="fileNameSub">Check each field against the original, then export.</p>
+                <p class="subtitle" id="fileNameSub">Compare the extracted data with the original document.</p>
             </div>
             <div class="results-actions">
                 <button class="btn btn-secondary" id="exportJsonBtn" type="button">
@@ -70,7 +70,7 @@
             <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
             <div>
                 <strong id="reviewCount"></strong>
-                <span>Fields marked <span class="badge badge-review">Check</span> were read by the AI model but could not be found in the scanned text. Compare them with the original before using this record.</span>
+                <span>Fields marked <span class="badge badge-review">Check</span> were read by the AI model but could not be found in the scanned text. Compare them with the original document.</span>
             </div>
         </div>
 
@@ -95,12 +95,12 @@
             <div class="card info-card">
                 <div class="card-header"><i class="fas fa-user-circle" aria-hidden="true"></i> Patient &amp; prescriber</div>
                 <div class="card-grid">
-                    <label class="grid-item field"><span class="label">Patient name</span><input name="patient_name"></label>
-                    <label class="grid-item field"><span class="label">Age</span><input name="age"></label>
-                    <label class="grid-item field"><span class="label">Gender</span><input name="gender"></label>
-                    <label class="grid-item field"><span class="label">Date</span><input name="date"></label>
-                    <label class="grid-item field"><span class="label">Doctor</span><input name="doctor_name"></label>
-                    <label class="grid-item field"><span class="label">Hospital / clinic</span><input name="hospital"></label>
+                    <label class="grid-item field"><span class="label">Patient name</span><input name="patient_name" readonly></label>
+                    <label class="grid-item field"><span class="label">Age</span><input name="age" readonly></label>
+                    <label class="grid-item field"><span class="label">Gender</span><input name="gender" readonly></label>
+                    <label class="grid-item field"><span class="label">Date</span><input name="date" readonly></label>
+                    <label class="grid-item field"><span class="label">Doctor</span><input name="doctor_name" readonly></label>
+                    <label class="grid-item field"><span class="label">Hospital / clinic</span><input name="hospital" readonly></label>
                 </div>
             </div>
 
@@ -115,23 +115,20 @@
                                 <th>Dose</th>
                                 <th>Frequency</th>
                                 <th>Duration</th>
-                                <th><span class="visually-hidden">Status and actions</span></th>
+                                <th><span class="visually-hidden">Status</span></th>
                             </tr>
                         </thead>
                         <tbody id="medicinesBody"></tbody>
                     </table>
                 </div>
-                <button class="btn btn-secondary btn-sm" id="addMedicineBtn" type="button">
-                    <i class="fas fa-plus" aria-hidden="true"></i> Add medicine
-                </button>
             </div>
 
             <!-- Diagnosis / advice -->
             <div class="card info-card">
                 <div class="card-header"><i class="fas fa-stethoscope" aria-hidden="true"></i> Diagnosis &amp; advice</div>
                 <div class="card-grid">
-                    <label class="grid-item field field-wide"><span class="label">Diagnosis (one per line)</span><textarea name="diagnosis" rows="3"></textarea></label>
-                    <label class="grid-item field field-wide"><span class="label">Advice / instructions (one per line)</span><textarea name="instructions" rows="3"></textarea></label>
+                    <label class="grid-item field field-wide"><span class="label">Diagnosis</span><textarea name="diagnosis" rows="3" readonly></textarea></label>
+                    <label class="grid-item field field-wide"><span class="label">Advice / instructions</span><textarea name="instructions" rows="3" readonly></textarea></label>
                 </div>
             </div>
 
@@ -139,9 +136,9 @@
             <div class="card info-card">
                 <div class="card-header"><i class="fas fa-heartbeat" aria-hidden="true"></i> Vitals</div>
                 <div class="card-grid">
-                    <label class="grid-item field"><span class="label">Blood pressure</span><input name="vitals.bp"></label>
-                    <label class="grid-item field"><span class="label">Temperature</span><input name="vitals.temp"></label>
-                    <label class="grid-item field"><span class="label">Pulse</span><input name="vitals.pulse"></label>
+                    <label class="grid-item field"><span class="label">Blood pressure</span><input name="vitals.bp" readonly></label>
+                    <label class="grid-item field"><span class="label">Temperature</span><input name="vitals.temp" readonly></label>
+                    <label class="grid-item field"><span class="label">Pulse</span><input name="vitals.pulse" readonly></label>
                 </div>
             </div>
         </form>
@@ -200,7 +197,7 @@
 
             document.getElementById('displayText').innerText = text || 'No text found.';
             if (fileName) document.getElementById('fileNameSub').innerText =
-                'Source: ' + fileName + ' · Check each field against the original, then export.';
+                'Source: ' + fileName + ' · Compare the extracted data with the original document.';
 
             let data = {};
             try {
@@ -218,10 +215,6 @@
             setupToggle('rawTextToggle', 'rawTextBody');
             setExpanded('rawTextToggle', 'rawTextBody', false);
 
-            document.getElementById('addMedicineBtn').addEventListener('click', () => {
-                const row = addMedicineRow({});
-                row.querySelector('input').focus();
-            });
             document.getElementById('exportJsonBtn').addEventListener('click', exportJson);
             document.getElementById('exportCsvBtn').addEventListener('click', exportCsv);
             document.getElementById('printBtn').addEventListener('click', () => window.print());
@@ -258,35 +251,29 @@
                 medicines = data.matched_drugs.map(name => ({ name }));
             }
             medicines.forEach(addMedicineRow);
-            if (!medicines.length) addMedicineRow({});
+            if (!medicines.length) {
+                const row = document.createElement('tr');
+                row.innerHTML = '<td colspan="5" class="empty-row">No medicines were found on this document.</td>';
+                document.getElementById('medicinesBody').appendChild(row);
+            }
 
             updateReviewBanner();
         }
 
-        // Badge a field read by the AI model. Unverified ones need a person to confirm.
+        // Label a field read by the AI model. The record can't be edited, so a
+        // value the OCR text doesn't confirm stays marked "Check".
         function markSource(container, meta) {
             if (!container || !meta || !String(meta.source).includes('vlm')) return;
-            const badge = document.createElement('button');
-            badge.type = 'button';
+            const badge = document.createElement('span');
             if (meta.verified) {
                 badge.className = 'badge badge-ai';
                 badge.textContent = 'AI-read';
                 badge.title = 'Read by the AI model and found in the scanned text';
-                badge.disabled = true;
             } else {
                 container.classList.add('needs-review');
                 badge.className = 'badge badge-review';
                 badge.textContent = 'Check';
-                badge.title = 'Not found in the scanned text. Click once you have checked it against the original.';
-                badge.addEventListener('click', () => {
-                    meta.verified = true;   // fieldSources entry, or the row's own flags
-                    if (container.dataset.verified !== undefined) container.dataset.verified = 'true';
-                    container.classList.remove('needs-review');
-                    badge.className = 'badge badge-ok';
-                    badge.textContent = 'Checked';
-                    badge.disabled = true;
-                    updateReviewBanner();
-                });
+                badge.title = 'Read by the AI model but not found in the scanned text: compare it with the original';
             }
             (container.querySelector('.label') || container).appendChild(badge);
         }
@@ -299,6 +286,7 @@
                 const input = document.createElement('input');
                 input.name = key;
                 input.value = m[key] || '';
+                input.readOnly = true;
                 input.setAttribute('aria-label', key === 'name' ? 'Medicine' : key);
                 td.appendChild(input);
                 tr.appendChild(td);
@@ -309,13 +297,6 @@
             const label = document.createElement('span');
             label.className = 'label';
             actions.appendChild(label);
-            const remove = document.createElement('button');
-            remove.type = 'button';
-            remove.className = 'icon-btn';
-            remove.setAttribute('aria-label', 'Remove medicine');
-            remove.innerHTML = '<i class="fas fa-trash-can" aria-hidden="true"></i>';
-            remove.addEventListener('click', () => { tr.remove(); updateReviewBanner(); });
-            actions.appendChild(remove);
             tr.appendChild(actions);
 
             tr.dataset.source = m.source || 'user';

@@ -1486,3 +1486,31 @@ footer {
         display: none !important;
     }
 }
+
+/* The extracted record is read-only: show fields as text, not as inputs */
+.rx-form .field input[readonly],
+.rx-form .field textarea[readonly] {
+    padding-left: 0;
+    padding-right: 0;
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+    resize: none;
+    cursor: default;
+}
+
+.rx-form .needs-review input[readonly],
+.rx-form .needs-review textarea[readonly] {
+    padding-left: 0.5rem;
+    border-color: var(--warning);
+    background: var(--warning-soft);
+}
+
+.rx-table td:first-child input[readonly] {
+    font-weight: 600;
+}
+
+.rx-table .empty-row {
+    padding: 0.9rem 0.5rem;
+    color: var(--text-muted);
+}

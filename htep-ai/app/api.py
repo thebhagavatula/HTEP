@@ -26,7 +26,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
-from src.config import MAX_UPLOAD_MB, WEB_DIR
+from src.config import MAX_PDF_PAGES, MAX_UPLOAD_MB, WEB_DIR
 
 # The only writable place on serverless hosts. Uploads live here just long
 # enough to be processed, then are deleted.
@@ -34,8 +34,8 @@ UPLOAD_DIR = Path(tempfile.gettempdir()) / "htep-uploads"
 
 ALLOWED_SUFFIXES = {".pdf", ".png", ".jpg", ".jpeg"}
 
-from src.ocr.extractor import DocumentTooLargeError
-from src.pipeline.digitizer import Digitizer
+from src.ocr.extractor import DocumentTooLargeError, OCRPage
+from src.pipeline.digitizer import Digitizer, merge_vlm_result
 
 # -------------------------------
 # FLASK APP
@@ -158,6 +158,49 @@ def digitize():
         sys.stdout.flush()
         sys.stderr.flush()
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/extract", methods=["POST"])
+def extract():
+    """Build the record from text the browser recognized with PaddleOCR's models.
+
+    The browser keeps the image; only the recognized text and its confidence
+    arrive here: {"file": name, "pages": [{"text": ..., "confidence": ...}]}.
+    """
+    body = request.get_json(silent=True)
+    pages = body.get("pages") if isinstance(body, dict) else None
+    if not isinstance(pages, list) or not pages or len(pages) > MAX_PDF_PAGES:
+        return jsonify({"error": f"Expected JSON with 1 to {MAX_PDF_PAGES} pages of text"}), 400
+    try:
+        ocr_pages = [OCRPage(str(p.get("text") or "")[:20000], float(p.get("confidence") or 0))
+                     for p in pages if isinstance(p, dict)]
+    except (TypeError, ValueError):
+        return jsonify({"error": "Each page needs text and a numeric confidence"}), 400
+
+    load_engines()
+    with _process_lock:
+        result = digitizer.process_text(ocr_pages, name=secure_filename(str(body.get("file") or "")))
+    print(f"Extracted from browser OCR in {result['timings']['total']}s "
+          f"(ocr_confidence={result['ocr_confidence']}, fields_to_check={len(result['review_required'])})", flush=True)
+    return jsonify(result)
+
+
+@app.route("/api/merge", methods=["POST"])
+def merge():
+    """Merge a vision-model reading made on the user's device into a record.
+
+    The image never comes back here: the browser sends only the model's JSON
+    answer, the current record and the OCR text. Merging runs on the server so
+    the grounding rules live in one place (src/pipeline/grounding.py).
+    """
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict) or not isinstance(body.get("vlm_data"), dict):
+        return jsonify({"error": "Expected JSON with extracted_data, field_sources, ocr_text and vlm_data"}), 400
+
+    record, sources, review = merge_vlm_result(
+        body.get("extracted_data"), body.get("field_sources"), body["vlm_data"], str(body.get("ocr_text") or ""),
+    )
+    return jsonify({"extracted_data": record, "field_sources": sources, "review_required": review})
 
 
 @app.errorhandler(RequestEntityTooLarge)

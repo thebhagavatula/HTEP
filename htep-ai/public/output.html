@@ -74,6 +74,21 @@
             </div>
         </div>
 
+        <!-- Offered when the OCR looks unreliable (e.g. handwriting); runs in the browser -->
+        <div id="aiCard" class="card info-card ai-card" hidden>
+            <div class="card-header"><i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i> Read the handwriting with on-device AI</div>
+            <div class="ai-card-body">
+                <p id="aiReason"></p>
+                <p class="ai-note">The AI runs in your browser, so the image never leaves this device. The first run
+                    downloads about 2.5 GB, which your browser keeps for next time. Anything the AI reads that is
+                    not in the scanned text is marked <span class="badge badge-review">Check</span>.</p>
+                <button id="aiRunBtn" class="btn" type="button">
+                    <i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i> Read with on-device AI
+                </button>
+                <p id="aiStatus" class="status-message" role="status" aria-live="polite"></p>
+            </div>
+        </div>
+
         <form id="rxForm" class="rx-form" autocomplete="off" onsubmit="return false">
 
             <!-- Patient / prescriber -->
@@ -177,6 +192,7 @@
         const SCALAR_FIELDS = ['patient_name', 'age', 'gender', 'date', 'doctor_name', 'hospital'];
         const VITAL_FIELDS = ['bp', 'temp', 'pulse'];
         let fileName = '';
+        let fieldSources = {};   // where each field came from, kept up to date as the user checks fields
 
         document.addEventListener('DOMContentLoaded', () => {
             const text = localStorage.getItem('extractedText');
@@ -193,9 +209,10 @@
                 console.warn('Could not parse htepResponse:', e);
             }
 
-            renderMeta(data.classification || {}, data.timings || {}, data.vlm || {});
+            renderMeta(data.classification || {}, data.timings || {}, data.vlm || {}, data.ocr_location);
             fillForm(data);
             renderCorrections(data.corrections || []);
+            setupAiCard(data);
 
             setupToggle('correctionsToggle', 'correctionsBody');
             setupToggle('rawTextToggle', 'rawTextBody');
@@ -218,15 +235,20 @@
 
         function fillForm(data) {
             const ext = data.extracted_data || {};
-            const sources = data.field_sources || {};
+            fieldSources = JSON.parse(JSON.stringify(data.field_sources || {}));
+
+            // Start clean: this also runs again after the on-device AI reading is merged
+            document.getElementById('medicinesBody').innerHTML = '';
+            document.querySelectorAll('#rxForm .badge').forEach(b => b.remove());
+            document.querySelectorAll('#rxForm .needs-review').forEach(el => el.classList.remove('needs-review'));
 
             SCALAR_FIELDS.forEach(f => {
                 field(f).value = ext[f] || '';
-                markSource(field(f).closest('.field'), sources[f]);
+                markSource(field(f).closest('.field'), fieldSources[f]);
             });
             ['diagnosis', 'instructions'].forEach(f => {
                 field(f).value = (ext[f] || []).join('\n');
-                markSource(field(f).closest('.field'), sources[f]);
+                markSource(field(f).closest('.field'), fieldSources[f]);
             });
             VITAL_FIELDS.forEach(f => { field('vitals.' + f).value = (ext.vitals || {})[f] || ''; });
 
@@ -257,6 +279,8 @@
                 badge.textContent = 'Check';
                 badge.title = 'Not found in the scanned text. Click once you have checked it against the original.';
                 badge.addEventListener('click', () => {
+                    meta.verified = true;   // fieldSources entry, or the row's own flags
+                    if (container.dataset.verified !== undefined) container.dataset.verified = 'true';
                     container.classList.remove('needs-review');
                     badge.className = 'badge badge-ok';
                     badge.textContent = 'Checked';
@@ -294,6 +318,8 @@
             actions.appendChild(remove);
             tr.appendChild(actions);
 
+            tr.dataset.source = m.source || 'user';
+            tr.dataset.verified = String(m.verified !== false);
             markSource(tr, m.source ? { source: m.source, verified: m.verified } : null);
             document.getElementById('medicinesBody').appendChild(tr);
             return tr;
@@ -324,6 +350,85 @@
             record.source_file = fileName || null;
             record.exported_at = new Date().toISOString();
             record.unchecked_fields = document.querySelectorAll('#rxForm .needs-review').length;
+            return record;
+        }
+
+        /* ---------- On-device AI ---------- */
+
+        const AI_REASONS = {
+            little_ocr_text: 'Very little text could be read from this page, so it is probably handwritten.',
+            low_ocr_confidence: 'The text reader was unsure about parts of this page, so it is probably handwritten.',
+            no_medicines_found: 'No medicines could be read from this page.',
+        };
+
+        // Off until Qwen2-VL's handwriting quality and speed are verified on real devices
+        const ON_DEVICE_AI_ENABLED = false;
+
+        async function setupAiCard(data) {
+            if (!ON_DEVICE_AI_ENABLED) return;
+            if (!data.vlm || !data.vlm.recommended || !data.page_image) return;
+            const card = document.getElementById('aiCard');
+            const button = document.getElementById('aiRunBtn');
+            const status = (msg, isError = false) => {
+                const el = document.getElementById('aiStatus');
+                el.textContent = msg;
+                el.classList.toggle('is-error', isError);
+            };
+            document.getElementById('aiReason').textContent =
+                (AI_REASONS[data.vlm.reason] || 'The text reader may have missed parts of this page.') +
+                ' An AI model can read it again and fill in what is missing.';
+            card.hidden = false;
+
+            const vlm = await import('./vlm.js');
+            if (!(await vlm.isSupported())) {
+                button.disabled = true;
+                status('This browser cannot run the AI model (it needs WebGPU). Try a recent Chrome or Edge on a computer.', true);
+                return;
+            }
+
+            button.addEventListener('click', async () => {
+                button.disabled = true;
+                const started = Date.now();
+                try {
+                    const vlmData = await vlm.readPrescription(data.page_image, status);
+                    status('Checking the AI reading against the scanned text…');
+                    const response = await fetch(getApiBase() + '/api/merge', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            extracted_data: currentRecord(),
+                            field_sources: fieldSources,
+                            ocr_text: data.ocr_text || '',
+                            vlm_data: vlmData,
+                        }),
+                    });
+                    if (!response.ok) throw new Error(await serverError(response));
+                    Object.assign(data, await response.json());
+                    data.vlm = Object.assign({}, data.vlm, { used: true, on_device: true });
+                    localStorage.setItem('htepResponse', JSON.stringify(data));
+                    fillForm(data);
+                    status('Done in ' + Math.round((Date.now() - started) / 1000) +
+                           ' s. Fields filled by the AI are marked AI-read or Check.');
+                    button.hidden = true;
+                } catch (error) {
+                    console.error(error);
+                    status(error.message || 'The AI model could not run on this device.', true);
+                    button.disabled = false;
+                }
+            });
+        }
+
+        // The form as it is now, with each row's source, so the user's edits survive the merge
+        function currentRecord() {
+            const record = collectRecord();
+            record.medicines = [...document.querySelectorAll('#medicinesBody tr')].map(tr => {
+                const get = k => tr.querySelector('[name="' + k + '"]').value.trim() || null;
+                return {
+                    name: get('name'), dosage: get('dosage'), frequency: get('frequency'), duration: get('duration'),
+                    source: tr.dataset.source === 'user' ? 'ocr' : tr.dataset.source,
+                    verified: tr.dataset.verified !== 'false',
+                };
+            }).filter(m => m.name);
             return record;
         }
 
@@ -379,7 +484,7 @@
             }
         }
 
-        function renderMeta(classification, timings, vlm) {
+        function renderMeta(classification, timings, vlm, ocrLocation) {
             const meta = document.getElementById('resultMeta');
             const chips = [];
 
@@ -393,6 +498,13 @@
                 const labels = { routine: 'Routine', high: 'High priority', urgent: 'Urgent' };
                 const icon = urgency === 'routine' ? 'fa-check-circle' : 'fa-triangle-exclamation';
                 chips.push(makeChip('chip-urgency-' + urgency.replace(/[^a-z]/g, ''), icon, labels[urgency] || prettify(urgency)));
+            }
+
+            if (ocrLocation === 'browser') {
+                chips.push(makeChip('chip-ai', 'fa-microchip', 'Read on this device'));
+            } else if (ocrLocation === 'server') {
+                // This browser had no WebGPU: the server's lighter OCR read it
+                chips.push(makeChip('chip-urgency-high', 'fa-server', 'Read by the server (less accurate on handwriting)'));
             }
 
             if (vlm && vlm.used) {

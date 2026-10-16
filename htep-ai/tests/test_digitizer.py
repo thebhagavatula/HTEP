@@ -101,7 +101,8 @@ def test_vlm_fills_gaps_and_flags_values_not_in_ocr_text():
     result = Digitizer(ocr=FakeOCR(ocr_text, confidence=0.6), vlm=vlm).process("rx.png")
     data, sources = result["extracted_data"], result["field_sources"]
 
-    assert result["vlm"] == {"used": True, "reason": "low_ocr_confidence", "model": "fake-vlm"}
+    assert result["vlm"] == {"used": True, "recommended": True, "reason": "low_ocr_confidence", "model": "fake-vlm"}
+    assert result["page_image"] is None   # the server already ran a VLM
     assert data["patient_name"] == "Suresh"
     assert sources["patient_name"] == {"source": "vlm", "verified": True}
     assert sources["age"] == {"source": "vlm", "verified": False}
@@ -216,3 +217,73 @@ def test_rules_tolerate_handwriting_ocr_slips():
     assert data["instructions"][0] == "Avoid spicy food"
     assert data["doctor_name"] == "Dr. Haya Abdi"
     assert {"name": "DICLOFENAC SODIUM", "dosage": None, "frequency": "thrice", "duration": None} in data["medicines"]
+
+
+# ---------------------------------------------------------------- on-device VLM
+
+def test_without_server_vlm_the_browser_is_offered_a_page_preview(tmp_path):
+    import cv2
+    import numpy as np
+    image_path = tmp_path / "rx.png"
+    cv2.imwrite(str(image_path), np.full((2000, 1000, 3), 255, dtype=np.uint8))
+
+    vlm = FakeVLM(enabled=False)
+    result = Digitizer(ocr=FakeOCR("Rx\nTab. Dolo 650mg", confidence=0.5), vlm=vlm).process(image_path)
+
+    assert vlm.calls == 0
+    assert result["vlm"]["recommended"] is True and result["vlm"]["used"] is False
+    assert result["page_image"].startswith("data:image/jpeg;base64,")
+
+
+def test_reliable_ocr_is_not_offered_the_vlm():
+    result = Digitizer(ocr=FakeOCR(PRESCRIPTION), vlm=FakeVLM(enabled=False)).process("rx.png")
+    assert result["vlm"]["recommended"] is False
+    assert result["page_image"] is None
+
+
+def test_merge_endpoint_grounds_browser_vlm_reading(client):
+    test_client, _ = client
+    body = {
+        "ocr_text": "Patient's neme: Neetu verma\n2) Tab DIOFENAC SODIUM - som orally thrice",
+        "extracted_data": {"patient_name": "Neetu verma (edited)", "age": None,
+                           "medicines": [{"name": "Diclofenac Sodium", "dosage": None}]},
+        "field_sources": {"patient_name": {"source": "ocr", "verified": True}},
+        "vlm_data": {"patient_name": "Neetu Verma", "age": "60", "gender": "F",
+                     "medicines": [{"name": "Diclofenac Sodium", "dosage": "50mg", "frequency": "thrice a day"},
+                                   {"name": "Lansoprazole", "dosage": "30mg"}]},
+    }
+    out = test_client.post("/api/merge", json=body).get_json()
+    data, sources = out["extracted_data"], out["field_sources"]
+
+    assert data["patient_name"] == "Neetu verma (edited)"            # user's edit is kept
+    assert data["age"] == "60" and sources["age"] == {"source": "vlm", "verified": False}
+    diclo = next(m for m in data["medicines"] if m["name"] == "Diclofenac Sodium")
+    assert diclo["dosage"] == "50mg" and diclo["verified"] is False  # "50mg" not in the OCR text
+    assert diclo["source"] == "ocr+vlm"
+    assert any(m["name"] == "Lansoprazole" and m["source"] == "vlm" for m in data["medicines"])
+    assert "age" in out["review_required"]
+
+
+def test_merge_endpoint_rejects_bad_input(client):
+    test_client, _ = client
+    assert test_client.post("/api/merge", json={"vlm_data": "nope"}).status_code == 400
+
+
+# ---------------------------------------------------------------- browser OCR
+
+def test_extract_endpoint_builds_record_from_browser_text(client, monkeypatch):
+    from app import api
+    monkeypatch.setattr(api, "digitizer", Digitizer(ocr=FakeOCR(""), vlm=FakeVLM(enabled=False)))
+    test_client = api.app.test_client()
+    resp = test_client.post("/api/extract", json={"file": "rx.jpg", "pages": [{"text": PRESCRIPTION, "confidence": 0.97}]})
+    body = resp.get_json()
+    assert resp.status_code == 200
+    assert body["file"] == "rx.jpg" and body["ocr_confidence"] == 0.97
+    assert [m["name"] for m in body["extracted_data"]["medicines"]] == ["Dolo", "Omez"]
+    assert body["page_image"] is None   # the browser already has the image
+
+
+def test_extract_endpoint_rejects_bad_input(client):
+    test_client, _ = client
+    assert test_client.post("/api/extract", json={"pages": []}).status_code == 400
+    assert test_client.post("/api/extract", json={"pages": [{"text": "x", "confidence": "high"}]}).status_code == 400

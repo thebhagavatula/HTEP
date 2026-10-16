@@ -1452,3 +1452,37 @@ footer {
         background: none;
     }
 }
+
+/* ===============================
+   ON-DEVICE AI CARD
+=============================== */
+
+.ai-card {
+    margin-bottom: 1.5rem;
+    border-color: var(--brand);
+}
+
+.ai-card-body {
+    padding: 1rem 1.5rem 1.25rem;
+    font-size: 0.95rem;
+    line-height: 1.55;
+}
+
+.ai-card-body p {
+    margin: 0 0 0.75rem;
+}
+
+.ai-card-body .ai-note {
+    color: var(--text-muted);
+    font-size: 0.88rem;
+}
+
+.ai-card-body .status-message {
+    margin-top: 0.75rem;
+}
+
+@media print {
+    .ai-card {
+        display: none !important;
+    }
+}

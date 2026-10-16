@@ -170,35 +170,41 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let timeoutId, ticker;
 
-        // Show elapsed time while processing
+        // Show elapsed time while processing; `phase` says what is happening now
         let elapsed = 0;
-        const tick = (prefix) => {
+        let phase = 'Waiting for the extraction engine to start…';
+        const tick = () => {
             const hint = elapsed >= 20 ? ' Multi-page PDFs and handwritten prescriptions take longer.' : '';
-            setStatus(`${prefix} ${elapsed}s.${hint}`);
+            setStatus(`${phase} ${elapsed}s.${hint}`);
         };
 
         try {
-            // Don't race the warm-up: both requests would load the ML engines at once
-            ticker = setInterval(() => { elapsed++; tick('Waiting for the extraction engine to start…'); }, 1000);
-            await warmup;
-            clearInterval(ticker);
+            ticker = setInterval(() => { elapsed++; tick(); }, 1000);
 
-            // Abort just after the host's 300 s request limit so the server's limit governs
-            const controller = new AbortController();
-            timeoutId = setTimeout(() => controller.abort(), 310 * 1000);
+            // Preferred: PaddleOCR's models on the user's GPU (public/ocr.js); only
+            // the recognized text goes to the server. Otherwise the server reads it.
+            let data = await readInBrowser(file, (msg) => { phase = msg; tick(); });
 
-            tick('Reading your prescription…');
-            ticker = setInterval(() => { elapsed++; tick('Reading your prescription…'); }, 1000);
+            if (!data) {
+                // Don't race the warm-up: both requests would load the ML engines at once
+                phase = 'Waiting for the extraction engine to start…';
+                await warmup;
 
-            const response = await fetch(getApiBase() + '/api/digitize', {
-                method: 'POST',
-                body: formData,
-                signal: controller.signal
-            });
+                // Abort just after the host's 300 s request limit so the server's limit governs
+                const controller = new AbortController();
+                timeoutId = setTimeout(() => controller.abort(), 310 * 1000);
+                phase = 'Reading your prescription…';
+                tick();
 
-            if (!response.ok) throw new Error(await serverError(response));
-
-            const data = await response.json();
+                const response = await fetch(getApiBase() + '/api/digitize', {
+                    method: 'POST',
+                    body: formData,
+                    signal: controller.signal
+                });
+                if (!response.ok) throw new Error(await serverError(response));
+                data = await response.json();
+                data.ocr_location = 'server';
+            }
             clearTimeout(timeoutId);
             clearInterval(ticker);
 
@@ -232,6 +238,43 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
 });
+
+// OCR in the browser, then build the record on the server from the text.
+// Resolves to the record, or null if this browser can't (no WebGPU) or the
+// in-browser OCR failed, in which case the caller uses the server's OCR.
+async function readInBrowser(file, onStatus) {
+    let ocr;
+    try {
+        ocr = await import('./ocr.js');
+        if (!(await ocr.isSupported())) return null;
+    } catch (err) {
+        console.warn('In-browser OCR unavailable:', err);
+        return null;
+    }
+
+    let read;
+    try {
+        read = await ocr.readDocument(file, onStatus);
+    } catch (err) {
+        // Page limits are the user's to fix; anything else falls back to the server
+        if (/limit is/.test(err.message || '')) throw err;
+        console.warn('In-browser OCR failed, using the server instead:', err);
+        return null;
+    }
+
+    onStatus('Extracting the prescription details…');
+    const response = await fetch(getApiBase() + '/api/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file: file.name, pages: read.pages }),
+    });
+    if (!response.ok) throw new Error(await serverError(response));
+    const data = await response.json();
+    // The on-device vision model reads this preview if the OCR looks unreliable
+    data.page_image = data.vlm && data.vlm.recommended ? read.preview : null;
+    data.ocr_location = 'browser';
+    return data;
+}
 
 async function serverError(response) {
     let message = "Server error (" + response.status + ")";

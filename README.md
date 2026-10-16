@@ -11,7 +11,8 @@ Live site: <https://htep-ai.vercel.app>
 
 ```
 upload (PDF / PNG / JPEG)
-  -> OCR (RapidOCR: PP-OCR models on ONNX Runtime)
+  -> OCR in the user's browser: PaddleOCR's PP-OCRv6 medium models on WebGPU
+     (fallback without WebGPU: the server's lighter OCR)
   -> dictionary correction of drug and disease names
   -> rule-based field extraction
   -> [only if OCR looks unreliable] vision-language model reads the image
@@ -19,8 +20,20 @@ upload (PDF / PNG / JPEG)
   -> review page: unverified values are marked "Check"
 ```
 
-- **OCR** reads the page. Values the rules extract from OCR text are taken
-  from the page itself, so they are trusted.
+- **OCR** reads the page. It runs in the browser (`public/ocr.js`) with the
+  same PP-OCRv6 medium models PaddleOCR uses, through ONNX Runtime Web on
+  WebGPU: about 2 s per image on an integrated laptop GPU, where one server CPU
+  needs about 80 s. The models (~140 MB) download once per browser. Only the
+  recognized text is sent to the server (`POST /api/extract`), so the document
+  never leaves the device. `ocr.js` is a step-by-step port of RapidOCR's Python
+  pipeline; on test images it gives identical text for print and differs only
+  on borderline handwritten characters.
+- Browsers without WebGPU upload the file to `POST /api/digitize`, where the
+  server reads it with smaller models (PP-OCRv6 small + English PP-OCRv5),
+  which are fast enough for the free hosting plan but weaker on handwriting.
+  The review page says which reader was used.
+- Values the rules extract from OCR text are taken from the page itself, so
+  they are trusted.
 - **Vision-language model (VLM)** is a fallback reader for handwriting and messy
   layouts (default model: Qwen2.5-VL 7B). It runs only when the OCR confidence is
   low, there is little OCR text, or no medicines were found. It returns JSON
@@ -38,13 +51,16 @@ should always check the record against the original.
 
 ```
 htep-ai/
-  app/api.py              Flask API: POST /api/digitize, GET /api/status
+  app/api.py              Flask API: /api/extract (browser OCR text), /api/digitize
+                          (server OCR), /api/merge (VLM answer), /api/status
   src/pipeline/           digitizer.py (orchestration), grounding.py
   src/ocr/extractor.py    OCR engines: rapid (default), paddle, tesseract
   src/nlp/                field extraction, dictionary correction, classifier
   src/vlm/client.py       VLM client (Ollama or OpenAI-compatible API)
   public/                 static frontend (served by Vercel's CDN)
-  models/ocr/             the two ONNX OCR models (committed; ~18 MB)
+  public/ocr.js           in-browser OCR (ONNX Runtime Web + OpenCV.js + pdf.js)
+  public/models/ocr/      PP-OCRv6 medium models for the browser (~140 MB)
+  models/ocr/             the server's small OCR models (~18 MB)
   pyproject.toml          runtime dependencies + Vercel entrypoint
   vercel.json             function limits (300 s) and bundle exclusions
   tests/test_digitizer.py pipeline, grounding and API tests
@@ -72,9 +88,34 @@ Open <http://127.0.0.1:5000>. To digitize one file from the command line:
 
 Tests: `pip install pytest && python -m pytest tests/test_digitizer.py`.
 
-## Vision model (optional)
+## Vision model
 
-The VLM runs as a separate service, so the web server stays small. Set:
+### On-device (built; switched off until verified)
+
+`ON_DEVICE_AI_ENABLED` in `public/output.html` is `false` until Qwen2-VL's
+handwriting quality and speed have been checked on real devices.
+
+When the OCR looks unreliable (little text, low confidence, or no medicines
+found), the API returns `vlm.recommended: true` and a small preview of the
+first page (`page_image`). The review page then offers **Read with on-device
+AI**:
+
+1. `public/vlm.js` loads Qwen2-VL 2B (`onnx-community/Qwen2-VL-2B-Instruct`,
+   about 2.5 GB, cached by the browser after the first run) with
+   Transformers.js on WebGPU and reads the preview in the browser. The image
+   never leaves the user's device.
+2. The browser sends only the model's JSON answer, the current form and the
+   OCR text to `POST /api/merge`, which applies the same grounding rules as
+   the server: AI values only fill empty fields, and any value not found in
+   the OCR text is marked **Check**. Edits the user already made are kept.
+
+It needs a browser with WebGPU (a recent Chrome or Edge on a computer); other
+browsers keep the OCR-only result.
+
+### Server-side (optional, needs a GPU server)
+
+A server-side VLM can be used instead. It runs as a separate service, so the
+web server stays small. Set:
 
 | Variable | Default | Meaning |
 |---|---|---|
@@ -127,14 +168,11 @@ computer.
 
 ## Roadmap
 
-1. **On-device vision model (option A):** read handwriting with a small
-   vision model running in the user's browser (WebGPU), checked against the
-   OCR text. $0 and private: the image never leaves the device.
-2. **OCR in the browser:** run the same ONNX models with ONNX Runtime Web, so
+1. **OCR in the browser:** run the same ONNX models with ONNX Runtime Web, so
    there is no backend at all.
-3. **Lab reports:** test, value, unit and reference range, with out-of-range
+2. **Lab reports:** test, value, unit and reference range, with out-of-range
    flags. The classifier already recognizes lab reports; they need their own
    extractor in `src/pipeline/digitizer.py`.
-4. **Personal health records:** a patient's prescriptions and reports over
+3. **Personal health records:** a patient's prescriptions and reports over
    time, with a medicine schedule and lab trends. This needs accounts and
    storage.

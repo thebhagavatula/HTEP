@@ -10,10 +10,16 @@ it is verified. Rule-based values come straight from the OCR text, so they are
 verified. A VLM value is verified only if it can also be found in the OCR text;
 otherwise it is kept but listed in `review_required` for a person to check.
 
+When the OCR looks unreliable the response says so (`vlm.recommended`) and
+includes a small preview of the first page, so the browser can run a vision
+model on the user's own device and send its reading to `merge_vlm_result()`.
+
 Lab reports and personal health records are planned to plug in here as more
 document types; today every document goes through the prescription extractor.
 """
 
+import base64
+import copy
 import logging
 import time
 from pathlib import Path
@@ -40,6 +46,9 @@ IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg"}
 # Less OCR text than this means the OCR mostly failed (e.g. handwriting).
 MIN_USEFUL_OCR_CHARS = 40
 
+# The page preview sent back for the in-browser vision model
+PREVIEW_MAX_SIDE = 1280
+
 
 class Digitizer:
     def __init__(self, ocr: Optional[OCRExtractor] = None, vlm: Optional[VLMClient] = None):
@@ -52,15 +61,25 @@ class Digitizer:
     # ------------------------------------------------------------------
 
     def process(self, file_path: Path) -> Dict[str, Any]:
+        """OCR a file on the server, then extract the record."""
         file_path = Path(file_path)
-        timings: Dict[str, float] = {}
         start = time.time()
-
-        t0 = time.time()
         pages = self._read(file_path)
+        timings = {"ocr": round(time.time() - start, 2)}
+        return self._build(pages, timings, start, file_path=file_path, name=file_path.name)
+
+    def process_text(self, pages: List[OCRPage], name: str = "") -> Dict[str, Any]:
+        """Extract the record from text the user's browser already recognized.
+
+        The browser runs the OCR models itself (public/ocr.js) and keeps the
+        image, so there is no server-side VLM call or page preview here.
+        """
+        return self._build(pages, {}, time.time(), file_path=None, name=name)
+
+    def _build(self, pages: List[OCRPage], timings: Dict[str, float], start: float,
+               file_path: Optional[Path], name: str) -> Dict[str, Any]:
         ocr_text = "\n".join(p.text for p in pages).strip()
         ocr_confidence = round(min((p.confidence for p in pages), default=0.0), 3)
-        timings["ocr"] = round(time.time() - t0, 2)
 
         t0 = time.time()
         post = self.postprocessor.process(ocr_text) if ocr_text else {}
@@ -70,21 +89,27 @@ class Digitizer:
 
         record, sources = _from_rules(rules)
 
-        vlm_info: Dict[str, Any] = {"used": False, "reason": None, "model": None}
-        reason = self._vlm_reason(file_path, ocr_text, ocr_confidence, record)
-        if reason:
+        reason = _vlm_reason(ocr_text, ocr_confidence, record)
+        vlm_info: Dict[str, Any] = {"used": False, "recommended": reason is not None,
+                                    "reason": reason, "model": None}
+        page_image = None
+        server_vlm = file_path is not None and self.vlm.enabled and VLM_MODE != "off"
+        if server_vlm and (reason or VLM_MODE == "always"):
             t0 = time.time()
             vlm_data = self.vlm.extract_prescription(self._first_page_image(file_path))
             timings["vlm"] = round(time.time() - t0, 2)
-            vlm_info = {"used": vlm_data is not None, "reason": reason, "model": self.vlm.model}
+            vlm_info.update(used=vlm_data is not None, reason=reason or "always", model=self.vlm.model)
             if vlm_data:
                 _merge_vlm(record, sources, vlm_data, ocr_text)
+        if reason and not vlm_info["used"] and file_path is not None:
+            # No server-side VLM: let the browser read the page on the user's device
+            page_image = _preview_data_url(self._first_page_image(file_path))
 
         classification = self._classify(text)
         timings["total"] = round(time.time() - start, 2)
 
         return {
-            "file": file_path.name,
+            "file": name,
             "document_type": classification.get("document_type", "unknown"),
             "text": text,
             "ocr_text": ocr_text,
@@ -98,6 +123,7 @@ class Digitizer:
             "corrections": post.get("corrections", []),
             "classification": classification,
             "vlm": vlm_info,
+            "page_image": page_image,
             "timings": timings,
         }
 
@@ -107,20 +133,6 @@ class Digitizer:
         if file_path.suffix.lower() == ".pdf":
             return self.ocr.read_pdf(str(file_path))
         return [self.ocr.read_image(str(file_path))]
-
-    def _vlm_reason(self, file_path, ocr_text, ocr_confidence, record) -> Optional[str]:
-        """Why the VLM should read this document, or None to skip it."""
-        if not self.vlm.enabled or VLM_MODE == "off":
-            return None
-        if VLM_MODE == "always":
-            return "always"
-        if len(ocr_text) < MIN_USEFUL_OCR_CHARS:
-            return "little_ocr_text"
-        if ocr_confidence < VLM_MIN_OCR_CONFIDENCE:
-            return "low_ocr_confidence"
-        if not record["medicines"]:
-            return "no_medicines_found"
-        return None
 
     def _first_page_image(self, file_path: Path):
         if file_path.suffix.lower() in IMAGE_SUFFIXES:
@@ -146,8 +158,60 @@ class Digitizer:
 
 
 # ----------------------------------------------------------------------
+# When to ask a vision model
+# ----------------------------------------------------------------------
+
+def _vlm_reason(ocr_text: str, ocr_confidence: float, record: Dict[str, Any]) -> Optional[str]:
+    """Why a VLM should read this document, or None if the OCR looks reliable."""
+    if len(ocr_text) < MIN_USEFUL_OCR_CHARS:
+        return "little_ocr_text"
+    if ocr_confidence < VLM_MIN_OCR_CONFIDENCE:
+        return "low_ocr_confidence"
+    if not record["medicines"]:
+        return "no_medicines_found"
+    return None
+
+
+def _preview_data_url(image) -> Optional[str]:
+    if image is None:
+        return None
+    h, w = image.shape[:2]
+    scale = PREVIEW_MAX_SIDE / max(h, w)
+    if scale < 1:
+        image = cv2.resize(image, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+    ok, buf = cv2.imencode(".jpg", image, [cv2.IMWRITE_JPEG_QUALITY, 85])
+    return "data:image/jpeg;base64," + base64.b64encode(buf.tobytes()).decode("ascii") if ok else None
+
+
+# ----------------------------------------------------------------------
 # Merging
 # ----------------------------------------------------------------------
+
+def merge_vlm_result(record: Dict[str, Any], sources: Dict[str, Any], vlm_data: Dict[str, Any],
+                     ocr_text: str) -> Tuple[Dict[str, Any], Dict[str, Any], List[str]]:
+    """Merge a VLM reading made elsewhere (the user's browser) into a record.
+
+    Same rules as the server-side VLM: VLM values only fill empty fields, and a
+    value counts as verified only if it is found in the OCR text.
+    """
+    record = copy.deepcopy(record) if isinstance(record, dict) else {}
+    sources = copy.deepcopy(sources) if isinstance(sources, dict) else {}
+    for f in SCALAR_FIELDS:
+        record[f] = _clean(record.get(f))
+    for f in LIST_FIELDS:
+        record[f] = [str(x) for x in record.get(f) or [] if _clean(x)]
+    record["vitals"] = record.get("vitals") if isinstance(record.get("vitals"), dict) else {}
+    record["medicines"] = [
+        {"name": _clean(m.get("name")), **{k: _clean(m.get(k)) for k in MEDICINE_FIELDS},
+         "source": m.get("source", "ocr"), "verified": bool(m.get("verified", True))}
+        for m in record.get("medicines") or [] if isinstance(m, dict) and _clean(m.get("name"))
+    ]
+    sources = {f: {"source": str(v.get("source", "ocr")), "verified": bool(v.get("verified", True))}
+               for f, v in sources.items() if isinstance(v, dict)}
+    if isinstance(vlm_data, dict):
+        _merge_vlm(record, sources, vlm_data, ocr_text or "")
+    return record, sources, _review_required(record, sources)
+
 
 def _from_rules(rules: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     record: Dict[str, Any] = {f: rules.get(f) for f in SCALAR_FIELDS}
@@ -205,6 +269,8 @@ def _merge_vlm(record, sources, vlm: Dict[str, Any], ocr_text: str) -> None:
             for k, v in fields.items():
                 if v and not match.get(k):
                     match[k] = v
+                    if match.get("source") == "ocr":
+                        match["source"] = "ocr+vlm"
                     if not is_grounded(v, ocr_text):
                         match["verified"] = False
         else:
